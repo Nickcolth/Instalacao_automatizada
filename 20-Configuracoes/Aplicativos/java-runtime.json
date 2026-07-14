@@ -1,0 +1,34 @@
+{
+  "displayName": "Java Runtime Environment 8 x64",
+  "fileName": "jre-8u491-windows-x64.exe",
+  "silentArgs": "/s REBOOT=0 SPONSORS=0 AUTO_UPDATE=0",
+  "detectionPaths": [
+    "C:\\Program Files\\Java\\jre*\\bin\\java.exe",
+    "C:\\Program Files\\Java\\jre1.8.0_*\\bin\\java.exe",
+    "C:\\Program Files\\Common Files\\Oracle\\Java\\javapath\\java.exe",
+    "C:\\Program Files (x86)\\Java\\jre*\\bin\\java.exe"
+  ],
+  "detectionRegistryDisplayNames": [
+    "Java 8 Update * (64-bit)",
+    "Java 8 Update *",
+    "Java(TM) SE Runtime Environment 8*",
+    "Java*Update*"
+  ],
+  "successExitCodes": [
+    0,
+    1641,
+    3010
+  ],
+  "downloadTimeoutSeconds": 2400,
+  "installTimeoutSeconds": 2400,
+  "postDetectionTimeoutSeconds": 300,
+  "minimumInstallerBytes": 50000000,
+  "packageManagerOrder": [
+    "direct",
+    "winget",
+    "chocolatey"
+  ],
+  "wingetPackageId": "Oracle.JavaRuntimeEnvironment",
+  "wingetAdditionalArgs": "--architecture x64",
+  "chocolateyPackageId": "javaruntime"
+}

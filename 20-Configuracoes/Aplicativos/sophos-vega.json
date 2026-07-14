@@ -1,0 +1,24 @@
+{
+  "displayName": "Sophos Endpoint - Vega",
+  "fileName": "SophosSetup.exe",
+  "silentArgs": "--quiet",
+  "detectionPaths": [
+    "C:\\Program Files\\Sophos\\Sophos UI\\Sophos UI.exe"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 3600,
+  "detectionRegistryDisplayNames": [
+    "Sophos Endpoint*",
+    "Sophos Intercept X*",
+    "Sophos Central*"
+  ],
+  "detectionServices": [
+    "Sophos Endpoint Defense Service",
+    "Sophos MCS Agent"
+  ],
+  "postDetectionTimeoutSeconds": 600
+}

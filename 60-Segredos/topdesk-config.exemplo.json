@@ -1,0 +1,12 @@
+{
+  "baseUrl": "https://SUAEMPRESA.topdesk.net",
+  "username": "USUARIO_DA_INTEGRACAO",
+  "password": "SENHA_DA_INTEGRACAO",
+  "imageAccountName": "Imagem",
+  "imagePasswordFieldName": "senha-usuario-imagem",
+  "biosPasswordFieldName": "senha-bios",
+  "lapsFieldValue": "Gerenciado via LAPS",
+  "createImageAccountAsBackupWhenLapsDetected": true,
+  "networkBackupPath": "\\\\fileserver\\Backup\\logsenha",
+  "networkBackupTimeoutSeconds": 5
+}

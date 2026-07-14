@@ -1,0 +1,37 @@
+PACOTE INTUNE
+
+VERSAO
+2026.07.14.7
+
+FINALIDADE
+
+Preparar o dispositivo para executar a instalacao corporativa pelo
+Microsoft Intune e Windows Autopilot.
+
+FUNCIONAMENTO
+
+1. O Intune instala os arquivos de preparo.
+2. Uma tarefa e criada no Agendador de Tarefas.
+3. A tarefa aguarda a area de trabalho do colaborador.
+4. O repositorio atual e baixado do GitHub.
+5. Os arquivos sao validados.
+6. A instalacao corporativa e executada como SYSTEM.
+7. Pendencias sao verificadas novamente a cada 15 minutos.
+8. A tarefa e desativada depois da conclusao.
+
+TAREFA
+
+\ImagemTI\Autopilot-InstalacaoEmpresa
+
+DETECCAO
+
+70-Deteccao\Detectar-PreparoIntune.ps1
+
+A deteccao confirma a existencia dos arquivos de preparo e da tarefa
+agendada.
+
+LOGS
+
+C:\ProgramData\ImagemTI\Instalador\Logs\intune-bootstrap.log
+
+C:\ProgramData\ImagemTI\Instalador\Logs\intune-execucao-agendada.log

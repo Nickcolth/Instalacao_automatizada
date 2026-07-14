@@ -1,0 +1,26 @@
+{
+  "displayName": "Google Chrome",
+  "fileName": "chrome-installer.exe",
+  "silentArgs": "/silent /install",
+  "detectionPaths": [
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 1800,
+  "detectionRegistryDisplayNames": [
+    "Google Chrome*"
+  ],
+  "postDetectionTimeoutSeconds": 120,
+  "packageManagerOrder": [
+    "chocolatey",
+    "winget",
+    "direct"
+  ],
+  "chocolateyPackageId": "googlechrome",
+  "wingetPackageId": "Google.Chrome"
+}

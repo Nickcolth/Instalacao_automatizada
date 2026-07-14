@@ -1,0 +1,28 @@
+{
+  "descricao": "Execucao manual completa para o Service Desk.",
+  "maximoTentativasInstalacao": 3,
+  "aplicativosObrigatorios": [
+    "7zip",
+    "google-chrome",
+    "firefox",
+    "adobe-reader",
+    "supportassist",
+    "guardian",
+    "journey",
+    "java-runtime"
+  ],
+  "tarefas": [
+    "00-PreValidacao-RemoverAdminUsuarioAtual",
+    "10-Seguranca-InstalarAgentesEmpresa",
+    "20-Contas-UsuarioImagemEBIOS",
+    "30-Inventario-InstalarAgente",
+    "40-Sistema-ConfigurarEnergia",
+    "41-Sistema-ConfigurarDiscoDados",
+    "42-Sistema-PrepararGerenciadoresPacotes",
+    "43-Sistema-DesativarRelatorioErros",
+    "50-Aplicativos-InstalarBase",
+    "51-Aplicativos-InstalarOffice",
+    "80-Usuario-ConfigurarSessaoManual",
+    "90-Finalizacao-Manual"
+  ]
+}

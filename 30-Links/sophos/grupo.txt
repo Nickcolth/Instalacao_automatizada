@@ -1,0 +1,1 @@
+https://api-cloudstation-us-east-2.prod.hydra.sophos.com/api/download/f85fc52579c88bc88e2f62dc160b7d04/SophosSetup.exe

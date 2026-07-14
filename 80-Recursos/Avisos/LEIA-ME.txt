@@ -1,0 +1,6 @@
+Recursos usados somente na execucao manual.
+
+- Mostrar-AvisoFinalManual.ps1: exibe a imagem/video e toca o som de encerramento.
+- toasty.png e sonic.mp4 vieram do instalador original.
+
+O modo Intune/Autopilot nao chama esses recursos.

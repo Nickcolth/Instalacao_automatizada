@@ -1,0 +1,31 @@
+{
+  "displayName": "Adobe Acrobat / Reader",
+  "fileName": "AcroRdrDCx64_MUI.exe",
+  "silentArgs": "/sAll /rs /rps /msi EULA_ACCEPT=YES",
+  "detectionPaths": [
+    "C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe",
+    "C:\\Program Files (x86)\\Adobe\\Acrobat DC\\Acrobat\\Acrobat.exe",
+    "C:\\Program Files\\Adobe\\Acrobat Reader DC\\Reader\\AcroRd32.exe",
+    "C:\\Program Files (x86)\\Adobe\\Acrobat Reader DC\\Reader\\AcroRd32.exe",
+    "C:\\Program Files\\Adobe\\Acrobat Reader\\Reader\\AcroRd32.exe",
+    "C:\\Program Files (x86)\\Adobe\\Acrobat Reader\\Reader\\AcroRd32.exe"
+  ],
+  "detectionRegistryDisplayNames": [
+    "Adobe Acrobat*",
+    "Adobe Acrobat Reader*"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 1800,
+  "installTimeoutSeconds": 3600,
+  "postDetectionTimeoutSeconds": 120,
+  "packageManagerOrder": [
+    "chocolatey",
+    "winget",
+    "direct"
+  ],
+  "chocolateyPackageId": "adobereader",
+  "wingetPackageId": "Adobe.Acrobat.Reader.64-bit"
+}

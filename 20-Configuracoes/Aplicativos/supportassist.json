@@ -1,0 +1,19 @@
+{
+  "displayName": "Dell SupportAssist",
+  "fileName": "SupportAssistInstaller.exe",
+  "silentArgs": "/S",
+  "detectionPaths": [
+    "C:\\Program Files\\Dell\\SupportAssistAgent\\bin\\SupportAssist.exe"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 1800,
+  "detectionRegistryDisplayNames": [
+    "Dell SupportAssist*",
+    "SupportAssist*"
+  ],
+  "postDetectionTimeoutSeconds": 300
+}

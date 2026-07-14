@@ -1,0 +1,20 @@
+{
+  "displayName": "Guardian Desk",
+  "fileName": "GuardianSetup.exe",
+  "silentArgs": "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /ALLUSERS",
+  "detectionPaths": [
+    "C:\\Program Files (x86)\\MoreApps\\GuardianDesk\\GuardianDesk.exe",
+    "C:\\Program Files (x86)\\MoreAplicativos\\GuardianDesk\\GuardianDesk.exe"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 3600,
+  "detectionRegistryDisplayNames": [
+    "GuardianDesk*",
+    "Guardian Desk*"
+  ],
+  "postDetectionTimeoutSeconds": 180
+}

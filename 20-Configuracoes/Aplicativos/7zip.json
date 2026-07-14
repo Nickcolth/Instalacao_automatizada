@@ -1,0 +1,26 @@
+{
+  "displayName": "7-Zip",
+  "fileName": "7zip-x64.exe",
+  "silentArgs": "/S",
+  "detectionPaths": [
+    "C:\\Program Files\\7-Zip\\7z.exe"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 1800,
+  "detectionRegistryDisplayNames": [
+    "7-Zip*"
+  ],
+  "postDetectionTimeoutSeconds": 60,
+  "packageManagerOrder": [
+    "chocolatey",
+    "winget",
+    "direct"
+  ],
+  "chocolateyPackageId": "7zip",
+  "wingetPackageId": "7zip.7zip",
+  "minimumInstallerBytes": 1000000
+}

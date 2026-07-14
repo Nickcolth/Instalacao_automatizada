@@ -1,0 +1,25 @@
+{
+  "displayName": "Mozilla Firefox",
+  "fileName": "firefox-installer.exe",
+  "silentArgs": "/S",
+  "detectionPaths": [
+    "C:\\Program Files\\Mozilla Firefox\\firefox.exe"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 1800,
+  "detectionRegistryDisplayNames": [
+    "Mozilla Firefox*"
+  ],
+  "postDetectionTimeoutSeconds": 120,
+  "packageManagerOrder": [
+    "chocolatey",
+    "winget",
+    "direct"
+  ],
+  "chocolateyPackageId": "firefox",
+  "wingetPackageId": "Mozilla.Firefox"
+}

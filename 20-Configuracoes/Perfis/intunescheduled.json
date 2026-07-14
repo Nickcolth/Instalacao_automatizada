@@ -1,0 +1,22 @@
+{
+  "descricao": "Execucao pos-logon criada pelo bootstrap do Intune. Antes de qualquer outra etapa instala e confirma, nesta ordem, Atlas, Journey, Sophos e Guardian. SupportAssist nao e instalado pelo Intune.",
+  "maximoTentativasInstalacao": 3,
+  "aplicativosObrigatorios": [
+    "google-chrome",
+    "guardian",
+    "journey",
+    "java-runtime"
+  ],
+  "tarefas": [
+    "00-PreValidacao-RemoverAdminUsuarioAtual",
+    "10-Seguranca-InstalarAgentesEmpresa",
+    "20-Contas-UsuarioImagemEBIOS",
+    "30-Inventario-InstalarAgente",
+    "40-Sistema-ConfigurarEnergia",
+    "41-Sistema-ConfigurarDiscoDados",
+    "42-Sistema-PrepararGerenciadoresPacotes",
+    "43-Sistema-DesativarRelatorioErros",
+    "50-Aplicativos-InstalarBase",
+    "80-Usuario-ConfigurarSessaoManual"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "displayName": "Journey",
+  "fileName": "Journey-Setup.exe",
+  "silentArgs": "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-",
+  "detectionPaths": [
+    "C:\\Program Files\\Journey\\Journey.exe",
+    "C:\\Program Files (x86)\\Journey\\Journey.exe",
+    "C:\\Users\\Public\\Journey\\Journey.exe"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 1800,
+  "detectionRegistryDisplayNames": [
+    "Journey*"
+  ],
+  "postDetectionTimeoutSeconds": 180
+}

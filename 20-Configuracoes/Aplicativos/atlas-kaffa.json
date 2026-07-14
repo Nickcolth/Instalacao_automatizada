@@ -1,0 +1,22 @@
+{
+  "displayName": "Atlas Kaffa",
+  "fileName": "AtlasKaffa.exe",
+  "silentArgs": "-fullinstall",
+  "detectionPaths": [
+    "C:\\Program Files (x86)\\MoreApps\\MoreMesh\\MoreMesh.exe",
+    "C:\\Program Files\\MoreApps\\MoreMesh\\MoreMesh.exe",
+    "C:\\Program Files (x86)\\MoreApps\\Atlas\\Atlas.exe",
+    "C:\\Program Files\\MoreApps\\Atlas\\Atlas.exe"
+  ],
+  "successExitCodes": [
+    0,
+    3010
+  ],
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 1800,
+  "detectionRegistryDisplayNames": [
+    "MoreMesh*",
+    "Atlas*"
+  ],
+  "postDetectionTimeoutSeconds": 180
+}

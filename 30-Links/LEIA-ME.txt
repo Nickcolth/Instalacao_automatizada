@@ -1,0 +1,19 @@
+Como atualizar links
+
+Cada programa tem uma pasta dentro de 30-Links.
+
+Se a pasta tiver apenas um arquivo .txt, o instalador usa aquele link automaticamente.
+Exemplo:
+30-Links\guardian\padrao.txt
+
+Se a pasta tiver mais de um arquivo .txt, o instalador escolhe pela variante do aplicativo.
+Exemplos:
+atlas-atmis usa 30-Links\atlas\atmis.txt
+atlas-geo usa 30-Links\atlas\geo.txt
+sophos-grupo usa 30-Links\sophos\grupo.txt
+sophos-vega usa 30-Links\sophos\vega.txt
+
+Para trocar um link, abra o .txt correspondente e deixe apenas a URL do instalador.
+Nao coloque usuario, senha, token ou segredo nestes arquivos.
+
+Se futuramente uma empresa tiver instalador proprio, crie um novo .txt na pasta do programa e ajuste 20-Configuracoes\Empresas\empresas.json para usar o aplicativo correto.

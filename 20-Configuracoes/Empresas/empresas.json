@@ -1,0 +1,79 @@
+{
+  "descricao": "Mapeia prefixos de nomes dos equipamentos para os instaladores corporativos.",
+  "aplicativosPadrao": [
+    "guardian",
+    "journey"
+  ],
+  "empresas": [
+    {
+      "nome": "Atmis",
+      "prefixos": [
+        "NOTEGESTAO"
+      ],
+      "aplicativos": [
+        "atlas-atmis",
+        "sophos-grupo"
+      ]
+    },
+    {
+      "nome": "OPT",
+      "prefixos": [
+        "NOTEOPT"
+      ],
+      "aplicativos": [
+        "atlas-geo",
+        "sophos-grupo"
+      ]
+    },
+    {
+      "nome": "GEO",
+      "prefixos": [
+        "NOTEGEO"
+      ],
+      "aplicativos": [
+        "atlas-geo",
+        "sophos-grupo"
+      ]
+    },
+    {
+      "nome": "Sistemas",
+      "prefixos": [
+        "NOTESIS"
+      ],
+      "aplicativos": [
+        "atlas-kaffa",
+        "sophos-grupo"
+      ]
+    },
+    {
+      "nome": "Kaffa",
+      "prefixos": [
+        "NOTEKAFFA"
+      ],
+      "aplicativos": [
+        "atlas-kaffa",
+        "sophos-grupo"
+      ]
+    },
+    {
+      "nome": "Vega",
+      "prefixos": [
+        "NOTEVEGA"
+      ],
+      "aplicativos": [
+        "atlas-vega",
+        "sophos-vega"
+      ]
+    },
+    {
+      "nome": "Vunox",
+      "prefixos": [
+        "NOTEVUNOX"
+      ],
+      "aplicativos": [
+        "atlas-geo",
+        "sophos-grupo"
+      ]
+    }
+  ]
+}

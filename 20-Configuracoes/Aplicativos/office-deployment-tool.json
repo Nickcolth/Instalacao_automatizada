@@ -1,0 +1,12 @@
+{
+  "displayName": "Office Deployment Tool",
+  "fileName": "setup.exe",
+  "silentArgs": "",
+  "detectionPaths": [],
+  "successExitCodes": [
+    0
+  ],
+  "skipPostDetection": true,
+  "downloadTimeoutSeconds": 900,
+  "installTimeoutSeconds": 1800
+}
