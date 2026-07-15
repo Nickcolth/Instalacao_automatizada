@@ -77,6 +77,9 @@ foreach ($flagName in @(
     'intune_retry_pending.flag',
     'intune_scheduled_completed.flag',
     'intune_scheduled_failed.flag',
+    'intune_critical_completed.flag',
+    'installed_intunecritical.flag',
+    'failed_intunecritical.flag',
     'installed_intunescheduled.flag',
     'failed_intunescheduled.flag'
 )) {
@@ -190,7 +193,8 @@ Register-ScheduledTask `
     -Principal $principal `
     -Settings $settings `
     -Description (
-        'Baixa o instalador atual do GitHub e tenta novamente a cada ' +
+        'Instala os agentes criticos desde o provisionamento, aguarda ' +
+        'o desktop para as demais tarefas e tenta novamente a cada ' +
         '15 minutos ate concluir.'
     ) `
     -Force |
@@ -227,7 +231,7 @@ foreach ($property in @(
     @('IntuneBootstrapVersion', $PackageVersion),
     @('Repository', $Repository),
     @('Branch', $Branch),
-    @('FullInstallStatus', 'WaitingForDesktop')
+    @('FullInstallStatus', 'StartingCriticalPhase')
 )) {
     New-ItemProperty `
         -Path $registryPath `
@@ -238,11 +242,34 @@ foreach ($property in @(
         Out-Null
 }
 
+try {
+    Start-ScheduledTask `
+        -TaskPath $taskPath `
+        -TaskName $taskName `
+        -ErrorAction Stop
+
+    Write-StageLog `
+        -Message (
+            'Tarefa iniciada imediatamente para executar a fase ' +
+            'critica durante o provisionamento.'
+        ) `
+        -Level 'SUCCESS'
+}
+catch {
+    Write-StageLog `
+        -Message (
+            'Nao foi possivel iniciar a tarefa imediatamente: ' +
+            "$($_.Exception.Message). O gatilho automatico permanece " +
+            'ativo.'
+        ) `
+        -Level 'WARN'
+}
+
 Write-StageLog `
     -Message (
         "Preparo concluido. Tarefa criada: $taskPath$taskName. " +
-        'Primeira verificacao em ate 3 minutos; depois, a cada 15 ' +
-        'minutos.'
+        'A fase critica inicia imediatamente; o gatilho de seguranca ' +
+        'executa em ate 3 minutos e depois a cada 15 minutos.'
     ) `
     -Level 'SUCCESS'
 

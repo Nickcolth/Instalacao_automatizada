@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('Manual','IntuneScheduled')]
+    [ValidateSet('Manual','IntuneCritical','IntuneScheduled')]
     [string]$Mode,
 
     [string]$RepositoryRoot = $PSScriptRoot,
@@ -306,7 +306,7 @@ $missingAplicativos = @(
     Invoke-FinalAppVerification `
         -Context $context `
         -RequiredAplicativos @(
-            Get-ProfileRequiredAplicativos -Profile $profile
+            Get-RequiredAplicativos -Context $context
         )
 )
 
@@ -460,6 +460,27 @@ if ($hasFailure) {
 
 Remove-Item -Path $context.FailedFlagPath -Force -ErrorAction SilentlyContinue
 Set-Content -Path $context.FlagPath -Value (Get-Date -Format o) -Encoding ASCII -Force
+
+if ($Mode -eq 'IntuneCritical') {
+    Set-InstallerExecutionState `
+        -Status 'CriticalCompleted' `
+        -Message 'Atlas, Journey, Sophos e Guardian confirmados.' `
+        -ExitCode 0
+
+    Write-InstallerSummary `
+        -Context $context `
+        -FinalStatus 'Success'
+
+    Write-InstallerLog `
+        -Context $context `
+        -Message (
+            'Fase critica concluida com sucesso. O executor persistente ' +
+            'aguardara o desktop para iniciar as demais tarefas.'
+        ) `
+        -Level Success
+
+    exit 0
+}
 
 if ($context.IsScheduled) {
     $completionContent = @(

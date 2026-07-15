@@ -17,6 +17,7 @@ $requiredFiles = @(
     '00-Inicializacao\Executar-InstalacaoPersistente.ps1',
     '10-Nucleo\Instalador.Nucleo.psm1',
     '20-Configuracoes\Perfis\manual.json',
+    '20-Configuracoes\Perfis\intunecritical.json',
     '20-Configuracoes\Perfis\intunescheduled.json',
     '40-Tarefas\10-Seguranca-InstalarAgentesEmpresa.ps1',
     '40-Tarefas\50-Aplicativos-InstalarBase.ps1',
@@ -77,7 +78,11 @@ foreach ($jsonFile in @(
     }
 }
 
-foreach ($profileName in @('manual.json', 'intunescheduled.json')) {
+foreach ($profileName in @(
+    'manual.json',
+    'intunecritical.json',
+    'intunescheduled.json'
+)) {
     $profilePath = Join-Path `
         $root `
         "20-Configuracoes\Perfis\$profileName"
@@ -113,7 +118,9 @@ foreach ($requiredText in @(
     'archive/refs/heads/{1}.zip',
     'Invoke-RepositoryDownload',
     'Test-PowerShellSyntax',
-    'Test-JsonFiles'
+    'Test-JsonFiles',
+    'IntuneCritical',
+    'intunecritical.json'
 )) {
     if ($bootstrapContent -notmatch [regex]::Escape($requiredText)) {
         Add-ValidationError "Bootstrap sem trecho: $requiredText"
@@ -139,7 +146,9 @@ $runnerContent = Get-Content `
 foreach ($requiredText in @(
     'raw.githubusercontent.com',
     'Download-BootstrapWithInternetWait',
-    'New-TimeSpan -Minutes 15',
+    'IntuneCritical',
+    'intune_critical_completed.flag',
+    'CriticalReadyWaitingForDesktop',
     'intune_scheduled_completed.flag',
     'Disable-ScheduledTask'
 )) {

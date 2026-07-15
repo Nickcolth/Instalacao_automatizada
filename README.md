@@ -1,6 +1,6 @@
 # Instalacao automatizada corporativa
 
-Versao: **2026.07.14.7**
+Versao: **2026.07.15.1**
 
 Este repositorio automatiza a preparacao e a padronizacao de notebooks
 Windows utilizados pela empresa.
@@ -29,17 +29,20 @@ irm https://raw.githubusercontent.com/Nickcolth/Instalacao_automatizada/main/i.p
 
 ## Execucao pelo Intune
 
-O aplicativo Win32 prepara uma tarefa executada como `SYSTEM`.
+O aplicativo Win32 prepara e inicia uma tarefa executada como `SYSTEM`.
 
-A tarefa aguarda a area de trabalho do colaborador, baixa a versao atual
-do repositorio e executa a instalacao corporativa. Quando existem
-pendencias, uma nova verificacao ocorre a cada 15 minutos.
-
-A etapa inicial instala os agentes na seguinte ordem:
+A tarefa baixa a versao atual do repositorio e inicia os agentes
+corporativos, inclusive durante o OOBE, na seguinte ordem:
 
 ```text
 Atlas -> Journey -> Sophos -> Guardian
 ```
+
+Depois que os quatro agentes forem confirmados, a tarefa aguarda a Area
+de Trabalho real do colaborador para executar os demais aplicativos e
+configuracoes.
+
+A fase critica insiste continuamente com nova tentativa a cada 60 segundos. Depois dela, quando existem pendencias nas demais etapas, uma nova verificacao ocorre a cada 15 minutos.
 
 ## Estrutura
 

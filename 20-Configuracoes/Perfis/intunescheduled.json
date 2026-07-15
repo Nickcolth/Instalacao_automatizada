@@ -1,5 +1,5 @@
 {
-  "descricao": "Execucao pos-logon criada pelo bootstrap do Intune. Antes de qualquer outra etapa instala e confirma, nesta ordem, Atlas, Journey, Sophos e Guardian. SupportAssist nao e instalado pelo Intune.",
+  "descricao": "Execucao completa da tarefa persistente depois que a Area de Trabalho do colaborador estiver pronta. Reconfirma Atlas, Journey, Sophos e Guardian antes das demais tarefas. SupportAssist nao e instalado pelo Intune.",
   "maximoTentativasInstalacao": 3,
   "aplicativosObrigatorios": [
     "google-chrome",

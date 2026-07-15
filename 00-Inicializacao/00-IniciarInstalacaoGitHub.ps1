@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Auto','Manual','IntuneScheduled')]
+    [ValidateSet('Auto','Manual','IntuneCritical','IntuneScheduled')]
     [string]$Mode = 'Auto',
 
     [string]$Repository = 'Nickcolth/Instalacao_automatizada',
@@ -353,6 +353,7 @@ function Test-EssentialRepositoryFiles {
         'Executar-Instalador.ps1',
         '10-Nucleo\Instalador.Nucleo.psm1',
         '20-Configuracoes\Perfis\manual.json',
+        '20-Configuracoes\Perfis\intunecritical.json',
         '20-Configuracoes\Perfis\intunescheduled.json'
     )
 
@@ -366,6 +367,9 @@ function Test-EssentialRepositoryFiles {
 
     $profileName = if ($ResolvedMode -eq 'Manual') {
         'manual.json'
+    }
+    elseif ($ResolvedMode -eq 'IntuneCritical') {
+        'intunecritical.json'
     }
     else {
         'intunescheduled.json'

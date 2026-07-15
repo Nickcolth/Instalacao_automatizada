@@ -320,7 +320,11 @@ function Set-ExecutionStatus {
         @('FullInstallStatus', $Status, 'String'),
         @('FullInstallAttempt', $Attempt, 'DWord'),
         @('FullInstallLastMessage', $Message, 'String'),
-        @('FullInstallLastRunAt', (Get-Date).ToString('o'), 'String')
+        @(
+            'FullInstallLastRunAt',
+            (Get-Date).ToString('o'),
+            'String'
+        )
     )) {
         New-ItemProperty `
             -Path $registryPath `
@@ -332,9 +336,67 @@ function Set-ExecutionStatus {
     }
 }
 
+function Invoke-BootstrapPhase {
+    param(
+        [string]$BootstrapPath,
+        [string]$ExecutionMode,
+        [string]$PhaseName
+    )
+
+    Write-RunnerLog (
+        "Iniciando $PhaseName. Modo do instalador: $ExecutionMode."
+    )
+
+    $arguments = @(
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', ('"{0}"' -f $BootstrapPath),
+        '-Mode', $ExecutionMode,
+        '-Repository', ('"{0}"' -f $Repository),
+        '-Branch', ('"{0}"' -f $Branch),
+        '-PackageVersion', ('"{0}"' -f $PackageVersion),
+        '-WorkingDirectory', ('"{0}"' -f $WorkingDirectory),
+        '-SecureRoot', ('"{0}"' -f $secureDirectory),
+        '-KeepFiles'
+    ) -join ' '
+
+    $process = Start-Process `
+        -FilePath 'powershell.exe' `
+        -ArgumentList $arguments `
+        -Wait `
+        -PassThru `
+        -WindowStyle Hidden
+
+    Write-RunnerLog `
+        -Message (
+            "$PhaseName finalizada com ExitCode " +
+            "$($process.ExitCode)."
+        ) `
+        -Level $(
+            if ($process.ExitCode -eq 0) {
+                'SUCCESS'
+            }
+            else {
+                'ERROR'
+            }
+        )
+
+    return [int]$process.ExitCode
+}
+
 $completedFlag = Join-Path `
     $flagDirectory `
     'intune_scheduled_completed.flag'
+
+$criticalCompletedFlag = Join-Path `
+    $flagDirectory `
+    'intune_critical_completed.flag'
+
+$retryPendingFlag = Join-Path `
+    $flagDirectory `
+    'intune_retry_pending.flag'
 
 if (Test-Path $completedFlag) {
     Set-ExecutionStatus `
@@ -358,21 +420,6 @@ if (Test-Path $completedFlag) {
     exit 0
 }
 
-$desktopUsers = @(
-    Wait-ForReadyDesktop `
-        -WaitMinutes $DesktopWaitMinutes `
-        -RetrySeconds $DesktopRetrySeconds
-)
-
-if ($desktopUsers.Count -eq 0) {
-    Set-ExecutionStatus `
-        -Status 'WaitingForDesktop' `
-        -Attempt (Get-ExecutionAttempt) `
-        -Message 'Desktop real ainda nao disponivel.'
-
-    exit 10
-}
-
 $bootstrapPath = Join-Path `
     $bootstrapDirectory `
     '00-IniciarInstalacaoGitHub.ps1'
@@ -387,66 +434,183 @@ $bootstrapUrl = [string]::Format(
     [Uri]::EscapeDataString($Branch)
 )
 
-$internetReady = Download-BootstrapWithInternetWait `
-    -Uri $bootstrapUrl `
-    -Destination $bootstrapPath `
-    -WaitMinutes $InternetWaitMinutes `
-    -RetrySeconds $InternetRetrySeconds
+$criticalAttempt = 0
 
-if (-not $internetReady) {
+while (-not (Test-Path $criticalCompletedFlag)) {
+    $criticalAttempt++
+
+    $internetReady = Download-BootstrapWithInternetWait `
+        -Uri $bootstrapUrl `
+        -Destination $bootstrapPath `
+        -WaitMinutes $InternetWaitMinutes `
+        -RetrySeconds $InternetRetrySeconds
+
+    if (-not $internetReady) {
+        Set-Content `
+            -Path $retryPendingFlag `
+            -Value (
+                '{0}|Phase=Critical|Step=Internet|Attempt={1}' -f `
+                    (Get-Date).ToString('o'), `
+                    $criticalAttempt
+            ) `
+            -Encoding ASCII `
+            -Force
+
+        Set-ExecutionStatus `
+            -Status 'WaitingForInternet' `
+            -Attempt $criticalAttempt `
+            -Message (
+                'Sem acesso ao bootstrap do GitHub durante a fase ' +
+                'critica. Nova tentativa em 60 segundos.'
+            )
+
+        Write-RunnerLog `
+            -Message (
+                'Fase critica sem acesso ao GitHub. Nova tentativa em ' +
+                '60 segundos.'
+            ) `
+            -Level 'WARN'
+
+        Start-Sleep -Seconds 60
+        continue
+    }
+
+    Set-ExecutionStatus `
+        -Status 'InstallingCriticalAgents' `
+        -Attempt $criticalAttempt `
+        -Message (
+            'Instalando Atlas, Journey, Sophos e Guardian antes de ' +
+            'aguardar o desktop.'
+        )
+
+    Write-RunnerLog `
+        -Message (
+            'FASE CRITICA: iniciando Atlas -> Journey -> Sophos -> ' +
+            "Guardian. Tentativa $criticalAttempt. Esta fase pode " +
+            'executar durante o OOBE.'
+        ) `
+        -Level 'WARN'
+
+    $criticalExitCode = Invoke-BootstrapPhase `
+        -BootstrapPath $bootstrapPath `
+        -ExecutionMode 'IntuneCritical' `
+        -PhaseName 'fase critica'
+
+    if ($criticalExitCode -eq 0) {
+        Set-Content `
+            -Path $criticalCompletedFlag `
+            -Value (
+                "Version=$PackageVersion`r`n" +
+                "Date=$((Get-Date).ToString('o'))`r`n" +
+                "Attempt=$criticalAttempt"
+            ) `
+            -Encoding ASCII `
+            -Force
+
+        Remove-Item `
+            -Path $retryPendingFlag `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+        Remove-Item `
+            -Path (
+                Join-Path $flagDirectory 'failed_intunecritical.flag'
+            ) `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+        Write-RunnerLog `
+            -Message (
+                'FASE CRITICA CONCLUIDA: Atlas, Journey, Sophos e ' +
+                'Guardian foram confirmados.'
+            ) `
+            -Level 'SUCCESS'
+
+        break
+    }
+
     Set-Content `
-        -Path (Join-Path $flagDirectory 'intune_retry_pending.flag') `
-        -Value (Get-Date).ToString('o') `
+        -Path $retryPendingFlag `
+        -Value (
+            '{0}|Phase=Critical|ExitCode={1}|Attempt={2}' -f `
+                (Get-Date).ToString('o'), `
+                $criticalExitCode, `
+                $criticalAttempt
+        ) `
         -Encoding ASCII `
         -Force
 
     Set-ExecutionStatus `
-        -Status 'WaitingForInternet' `
-        -Attempt (Get-ExecutionAttempt) `
-        -Message 'Sem acesso ao bootstrap do GitHub.'
+        -Status 'CriticalPendingRetry' `
+        -Attempt $criticalAttempt `
+        -Message (
+            "Fase critica nao concluida. ExitCode: " +
+            "$criticalExitCode. Nova tentativa em 60 segundos."
+        )
 
-    exit 20
+    Write-RunnerLog `
+        -Message (
+            'A fase critica nao foi concluida. Nenhuma instalacao ' +
+            'dependente do usuario sera iniciada. Nova tentativa em ' +
+            '60 segundos.'
+        ) `
+        -Level 'ERROR'
+
+    Start-Sleep -Seconds 60
 }
 
-$attempt = (Get-ExecutionAttempt) + 1
+$attempt = $criticalAttempt
+Set-ExecutionStatus `
+    -Status 'CriticalReadyWaitingForDesktop' `
+    -Attempt $attempt `
+    -Message (
+        'Agentes criticos confirmados. Aguardando o desktop real para ' +
+        'continuar.'
+    )
+
+$desktopUsers = @(
+    Wait-ForReadyDesktop `
+        -WaitMinutes $DesktopWaitMinutes `
+        -RetrySeconds $DesktopRetrySeconds
+)
+
+if ($desktopUsers.Count -eq 0) {
+    Remove-Item `
+        -Path $retryPendingFlag `
+        -Force `
+        -ErrorAction SilentlyContinue
+
+    Write-RunnerLog `
+        -Message (
+            'Os agentes criticos estao instalados, mas o desktop real ' +
+            'ainda nao esta pronto. O restante sera executado em uma ' +
+            'proxima rodada.'
+        ) `
+        -Level 'SUCCESS'
+
+    exit 10
+}
 
 Set-ExecutionStatus `
     -Status 'Running' `
     -Attempt $attempt `
-    -Message 'Executando instalacao corporativa.'
+    -Message 'Executando a preparacao completa depois do desktop.'
 
 Write-RunnerLog (
-    "Iniciando tentativa persistente numero $attempt."
+    "Iniciando tentativa completa numero $attempt."
 )
 
-$arguments = @(
-    '-NoLogo',
-    '-NoProfile',
-    '-NonInteractive',
-    '-ExecutionPolicy', 'Bypass',
-    '-File', ('"{0}"' -f $bootstrapPath),
-    '-Mode', 'IntuneScheduled',
-    '-Repository', ('"{0}"' -f $Repository),
-    '-Branch', ('"{0}"' -f $Branch),
-    '-PackageVersion', ('"{0}"' -f $PackageVersion),
-    '-WorkingDirectory', ('"{0}"' -f $WorkingDirectory),
-    '-SecureRoot', ('"{0}"' -f $secureDirectory),
-    '-KeepFiles'
-) -join ' '
-
-$process = Start-Process `
-    -FilePath 'powershell.exe' `
-    -ArgumentList $arguments `
-    -Wait `
-    -PassThru `
-    -WindowStyle Hidden
+$fullExitCode = Invoke-BootstrapPhase `
+    -BootstrapPath $bootstrapPath `
+    -ExecutionMode 'IntuneScheduled' `
+    -PhaseName 'preparacao completa'
 
 if (
-    $process.ExitCode -eq 0 -and
+    $fullExitCode -eq 0 -and
     (Test-Path $completedFlag)
 ) {
     Remove-Item `
-        -Path (Join-Path $flagDirectory 'intune_retry_pending.flag') `
+        -Path $retryPendingFlag `
         -Force `
         -ErrorAction SilentlyContinue
 
@@ -480,11 +644,11 @@ if (
 }
 
 Set-Content `
-    -Path (Join-Path $flagDirectory 'intune_retry_pending.flag') `
+    -Path $retryPendingFlag `
     -Value (
-        '{0}|ExitCode={1}|Attempt={2}' -f `
+        '{0}|Phase=Full|ExitCode={1}|Attempt={2}' -f `
             (Get-Date).ToString('o'), `
-            $process.ExitCode, `
+            $fullExitCode, `
             $attempt
     ) `
     -Encoding ASCII `
@@ -494,13 +658,13 @@ Set-ExecutionStatus `
     -Status 'PendingRetry' `
     -Attempt $attempt `
     -Message (
-        "Instalacao nao concluida. ExitCode: $($process.ExitCode)."
+        "Instalacao completa nao concluida. ExitCode: $fullExitCode."
     )
 
 Write-RunnerLog `
     -Message (
-        "Tentativa $attempt nao concluiu a instalacao. ExitCode: " +
-        "$($process.ExitCode). A tarefa tentara novamente."
+        "Tentativa completa $attempt nao concluiu a instalacao. " +
+        "ExitCode: $fullExitCode. A tarefa tentara novamente."
     ) `
     -Level 'ERROR'
 

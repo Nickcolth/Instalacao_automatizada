@@ -1,23 +1,27 @@
 PACOTE INTUNE
 
 VERSAO
-2026.07.14.7
+2026.07.15.1
 
 FINALIDADE
 
-Preparar o dispositivo para executar a instalacao corporativa pelo
-Microsoft Intune e Windows Autopilot.
+Preparar e iniciar a tarefa persistente utilizada durante o Windows
+Autopilot.
 
 FUNCIONAMENTO
 
 1. O Intune instala os arquivos de preparo.
-2. Uma tarefa e criada no Agendador de Tarefas.
-3. A tarefa aguarda a area de trabalho do colaborador.
-4. O repositorio atual e baixado do GitHub.
-5. Os arquivos sao validados.
-6. A instalacao corporativa e executada como SYSTEM.
-7. Pendencias sao verificadas novamente a cada 15 minutos.
-8. A tarefa e desativada depois da conclusao.
+2. A tarefa e criada como SYSTEM e iniciada imediatamente.
+3. Atlas, Journey, Sophos e Guardian sao instalados e confirmados,
+   inclusive durante o OOBE.
+4. A tarefa aguarda a Area de Trabalho real do colaborador.
+5. Os demais aplicativos e configuracoes sao executados.
+6. A fase critica repete a cada 60 segundos ate concluir. As demais pendencias sao verificadas novamente a cada 15 minutos.
+7. A tarefa e desativada depois da conclusao.
+
+ORDEM DOS AGENTES
+
+Atlas -> Journey -> Sophos -> Guardian
 
 TAREFA
 

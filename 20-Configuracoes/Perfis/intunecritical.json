@@ -1,0 +1,11 @@
+{
+  "descricao": "Execucao inicial da tarefa persistente no contexto SYSTEM. Instala e confirma Atlas, Journey, Sophos e Guardian na ordem definida, inclusive durante o OOBE.",
+  "maximoTentativasInstalacao": 3,
+  "aplicativosObrigatorios": [
+    "guardian",
+    "journey"
+  ],
+  "tarefas": [
+    "10-Seguranca-InstalarAgentesEmpresa"
+  ]
+}

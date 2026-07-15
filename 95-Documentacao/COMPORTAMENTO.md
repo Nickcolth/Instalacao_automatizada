@@ -1,5 +1,26 @@
 # Comportamento do instalador
 
+## Execucao pelo Intune
+
+O aplicativo Win32 cria e inicia uma tarefa persistente como `SYSTEM`.
+
+A tarefa executa duas fases:
+
+```text
+Fase critica durante o provisionamento:
+Atlas -> Journey -> Sophos -> Guardian
+
+Fase completa depois do desktop:
+aplicativos, configuracoes, inventario e sessao do colaborador
+```
+
+A fase completa somente comeca quando os quatro agentes forem detectados
+e a Area de Trabalho real do colaborador estiver pronta.
+
+Quando a fase critica nao e concluida, a tarefa insiste de
+novo a cada 60 segundos. Depois dela, as demais pendencias
+continuam sendo verificadas a cada 15 minutos.
+
 ## Aplicativos
 
 - verifica arquivos, registro e servicos antes de instalar;
@@ -8,14 +29,6 @@
 - audita todos os aplicativos planejados ao final;
 - tenta novamente somente os aplicativos ausentes;
 - registra a evidencia de deteccao nos logs.
-
-## Ordem do Intune
-
-```text
-Atlas -> Journey -> Sophos -> Guardian
-```
-
-Os quatro aplicativos formam a etapa inicial obrigatoria. O fluxo seguinte somente comeca depois que todos forem detectados.
 
 ## SupportAssist
 
@@ -33,7 +46,8 @@ Microsoft 365, Project e Visio sao verificados separadamente.
 3. Chocolatey
 ```
 
-A validacao confirma o executavel, o tamanho minimo do instalador e a deteccao depois da instalacao.
+A validacao confirma o executavel, o tamanho minimo do instalador e a
+deteccao depois da instalacao.
 
 ## Atalho Desligar
 
@@ -43,11 +57,13 @@ O recurso fica em:
 C:\ProgramData\ImagemTI\Recursos\Desligar.vbs
 ```
 
-Os atalhos sao criados no Menu Iniciar e na Area de Trabalho do colaborador.
+Os atalhos sao criados no Menu Iniciar e na Area de Trabalho do
+colaborador.
 
 ## TOPdesk
 
-O arquivo `50-Integracoes\Topdesk\Get_Topdesk.ps1` deve manter o SHA-256:
+O arquivo `50-Integracoes\Topdesk\Get_Topdesk.ps1` deve manter o
+SHA-256:
 
 ```text
 c65b3b41ed4202a1aef3f7876bb522b8b955df80f6bb09fed4a2cbe745767793
