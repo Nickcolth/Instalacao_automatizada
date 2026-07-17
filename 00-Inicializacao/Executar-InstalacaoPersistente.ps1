@@ -177,28 +177,48 @@ function Wait-ForReadyDesktop {
     do {
         $attempt++
 
-        if (-not (Test-ProvisioningInterfaceActive)) {
-            $users = @(
-                Get-ReadyDesktopUsers `
-                    -MinimumExplorerAgeSeconds 60
+        $users = @(
+            Get-ReadyDesktopUsers `
+                -MinimumExplorerAgeSeconds 60
+        )
+
+        if ($users.Count -gt 0) {
+            $provisioningStillActive = (
+                Test-ProvisioningInterfaceActive
             )
 
-            if ($users.Count -gt 0) {
+            if ($provisioningStillActive) {
                 Write-RunnerLog `
                     -Message (
-                        'Desktop real confirmado para: ' +
-                        (($users.UserName) -join ', ') +
-                        '.'
+                        'Desktop real encontrado mesmo com processo ' +
+                        'residual do OOBE ativo. O Explorer do ' +
+                        'colaborador tera prioridade.'
                     ) `
-                    -Level 'SUCCESS'
-
-                return $users
+                    -Level 'WARN'
             }
+
+            Write-RunnerLog `
+                -Message (
+                    'Desktop real confirmado para: ' +
+                    (($users.UserName) -join ', ') +
+                    '.'
+                ) `
+                -Level 'SUCCESS'
+
+            return $users
         }
 
-        Write-RunnerLog (
-            "Desktop ainda nao esta pronto. Verificacao $attempt."
-        )
+        if (Test-ProvisioningInterfaceActive) {
+            Write-RunnerLog (
+                "OOBE ainda ativo e nenhum Explorer valido foi " +
+                "encontrado. Verificacao $attempt."
+            )
+        }
+        else {
+            Write-RunnerLog (
+                "Desktop ainda nao esta pronto. Verificacao $attempt."
+            )
+        }
 
         Start-Sleep -Seconds $RetrySeconds
     }

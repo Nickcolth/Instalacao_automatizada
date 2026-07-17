@@ -1,6 +1,6 @@
 # Instalacao automatizada corporativa
 
-Versao: **2026.07.15.1**
+Versao: **2026.07.16.1**
 
 Este repositorio automatiza a preparacao e a padronizacao de notebooks
 Windows utilizados pela empresa.

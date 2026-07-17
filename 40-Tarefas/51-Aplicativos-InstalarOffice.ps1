@@ -28,23 +28,71 @@ function Test-ExecutableFile {
 }
 
 function Get-OdtCandidates {
-    $urls = @()
-    foreach ($page in @(
-        'https://www.microsoft.com/en-us/download/details.aspx?id=49117',
-        'https://www.microsoft.com/en-us/download/confirmation.aspx?id=49117'
-    )) {
+    $urls = @(
+        'https://officecdn.microsoft.com/pr/wsus/setup.exe',
+        (
+            'https://download.microsoft.com/download/' +
+            '6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/' +
+            'officedeploymenttool_20131-20090.exe'
+        )
+    )
+
+    $catalogPages = @(
+        (
+            'https://www.microsoft.com/en-us/download/' +
+            'details.aspx?id=49117'
+        ),
+        (
+            'https://www.microsoft.com/pt-br/download/' +
+            'details.aspx?id=49117'
+        )
+    )
+
+    foreach ($page in $catalogPages) {
         try {
-            Write-InstallerLog -Context $Context -Message "Consultando pagina do Office Deployment Tool: $page"
-            $response = Invoke-WebRequest -Uri $page -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop
-            $matches = [regex]::Matches([string]$response.Content, 'https://download\.microsoft\.com/[^"''<>\s]+\.exe')
-            foreach ($match in @($matches)) { $urls += [Net.WebUtility]::HtmlDecode([string]$match.Value) }
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    'Consultando o catalogo oficial do Office ' +
+                    "Deployment Tool: $page"
+                )
+
+            $response = Invoke-WebRequest `
+                -Uri $page `
+                -UseBasicParsing `
+                -TimeoutSec 60 `
+                -ErrorAction Stop
+
+            $matches = [regex]::Matches(
+                [string]$response.Content,
+                'https://download\.microsoft\.com/[^"''<>\s]+\.exe',
+                [Text.RegularExpressions.RegexOptions]::IgnoreCase
+            )
+
+            foreach ($match in @($matches)) {
+                $urls += [Net.WebUtility]::HtmlDecode(
+                    [string]$match.Value
+                )
+            }
         }
         catch {
-            Write-InstallerLog -Context $Context -Message "Falha ao consultar pagina do ODT: $($_.Exception.Message)" -Level Warning
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    'A consulta opcional ao catalogo do ODT falhou em ' +
+                    "${page}: $($_.Exception.Message). As origens " +
+                    'diretas da Microsoft continuam disponiveis.'
+                )
         }
     }
-    $urls += 'https://officecdn.microsoft.com/pr/wsus/setup.exe'
-    return @($urls | Select-Object -Unique)
+
+    return @(
+        $urls |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace($_)
+            } |
+            Select-Object -Unique
+    )
 }
 
 function Get-OfficeSetup {
@@ -193,6 +241,8 @@ for (
             -FilePath $setup `
             -ArgumentList "/download `"$config`"" `
             -TimeoutSeconds 7200 `
+            -HeartbeatSeconds 60 `
+            -MonitorPath $officeFolder `
             -Name (
                 "Download do Office - tentativa $attempt"
             )
@@ -233,6 +283,8 @@ for (
             -FilePath $setup `
             -ArgumentList "/configure `"$config`"" `
             -TimeoutSeconds 7200 `
+            -HeartbeatSeconds 60 `
+            -MonitorPath $officeFolder `
             -Name (
                 "Instalacao do Office - tentativa $attempt"
             )

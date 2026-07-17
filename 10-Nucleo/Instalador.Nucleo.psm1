@@ -517,6 +517,162 @@ function Get-ManifestStringArray {
 
 
 
+function Get-ComputerManufacturerInfo {
+    param($Context)
+
+    if (
+        $Context.PSObject.Properties.Name -contains
+        'ComputerManufacturerInfo'
+    ) {
+        return $Context.ComputerManufacturerInfo
+    }
+
+    $manufacturer = ''
+    $model = ''
+    $querySucceeded = $false
+
+    try {
+        $computerSystem = Get-CimInstance `
+            -ClassName Win32_ComputerSystem `
+            -ErrorAction Stop
+
+        $manufacturer = [string]$computerSystem.Manufacturer
+        $model = [string]$computerSystem.Model
+        $querySucceeded = $true
+    }
+    catch {
+        Write-InstallerLog `
+            -Context $Context `
+            -Message (
+                'Nao foi possivel consultar o fabricante do ' +
+                "equipamento: $($_.Exception.Message)"
+            ) `
+            -Level Warning
+    }
+
+    $information = [pscustomobject]@{
+        Manufacturer = $manufacturer
+        Model = $model
+        QuerySucceeded = $querySucceeded
+    }
+
+    $Context |
+        Add-Member `
+            -MemberType NoteProperty `
+            -Name ComputerManufacturerInfo `
+            -Value $information `
+            -Force
+
+    if ($querySucceeded) {
+        Write-InstallerLog `
+            -Context $Context `
+            -Message (
+                'Equipamento identificado. Fabricante: ' +
+                "$manufacturer. Modelo: $model."
+            )
+    }
+
+    return $information
+}
+
+function Test-AppApplicableToCurrentDevice {
+    param(
+        $Context,
+        [string]$Name,
+        [switch]$LogDecision
+    )
+
+    $manifest = Get-AppManifest `
+        -Context $Context `
+        -Name $Name
+
+    $allowedManufacturers = @(
+        Get-ManifestStringArray `
+            -Manifest $manifest `
+            -Name 'allowedManufacturers'
+    )
+
+    if ($allowedManufacturers.Count -eq 0) {
+        return $true
+    }
+
+    $computer = Get-ComputerManufacturerInfo `
+        -Context $Context
+
+    $manufacturer = [string]$computer.Manufacturer
+    $model = [string]$computer.Model
+    $isApplicable = $false
+    $matchedValue = ''
+
+    foreach ($allowedManufacturer in $allowedManufacturers) {
+        $needle = [string]$allowedManufacturer
+
+        if ([string]::IsNullOrWhiteSpace($needle)) {
+            continue
+        }
+
+        if (
+            $manufacturer -like "*$needle*" -or
+            $model -like "*$needle*"
+        ) {
+            $isApplicable = $true
+            $matchedValue = $needle
+            break
+        }
+    }
+
+    if ($LogDecision) {
+        $displayName = [string](
+            Get-ObjectPropertyValue `
+                -Object $manifest `
+                -Name 'displayName' `
+                -DefaultValue $Name
+        )
+
+        if ($isApplicable) {
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    "$displayName permitido para este equipamento. " +
+                    "Fabricante: $manufacturer. Modelo: $model. " +
+                    "Correspondencia: $matchedValue."
+                ) `
+                -Level Success
+        }
+        else {
+            $restrictionMessage = [string](
+                Get-ObjectPropertyValue `
+                    -Object $manifest `
+                    -Name 'manufacturerRestrictionMessage' `
+                    -DefaultValue (
+                        "$displayName nao se aplica ao fabricante " +
+                        'deste equipamento.'
+                    )
+            )
+
+            $manufacturerText = if (
+                [string]::IsNullOrWhiteSpace($manufacturer)
+            ) {
+                'nao identificado'
+            }
+            else {
+                $manufacturer
+            }
+
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    "$restrictionMessage Fabricante detectado: " +
+                    "$manufacturerText. Modelo: $model. O aplicativo " +
+                    'sera ignorado e nao participara da auditoria.'
+                ) `
+                -Level Warning
+        }
+    }
+
+    return $isApplicable
+}
+
 function Get-LinkPartsFromAppName {
     param([string]$Name)
 
@@ -849,23 +1005,187 @@ function Test-AppInstalledByName {
 
 
 
+function Format-InstallerByteSize {
+    param([long]$Bytes)
+
+    if ($Bytes -ge 1GB) {
+        return (
+            '{0:N2} GB' -f ($Bytes / 1GB)
+        )
+    }
+
+    if ($Bytes -ge 1MB) {
+        return (
+            '{0:N2} MB' -f ($Bytes / 1MB)
+        )
+    }
+
+    if ($Bytes -ge 1KB) {
+        return (
+            '{0:N2} KB' -f ($Bytes / 1KB)
+        )
+    }
+
+    return "$Bytes byte(s)"
+}
+
+function Get-InstallerPathSize {
+    param([string]$Path)
+
+    if (
+        [string]::IsNullOrWhiteSpace($Path) -or
+        -not (Test-Path $Path)
+    ) {
+        return [long]0
+    }
+
+    try {
+        $item = Get-Item `
+            -Path $Path `
+            -ErrorAction Stop
+
+        if (-not $item.PSIsContainer) {
+            return [long]$item.Length
+        }
+
+        $measurement = Get-ChildItem `
+            -Path $Path `
+            -Recurse `
+            -File `
+            -Force `
+            -ErrorAction SilentlyContinue |
+            Measure-Object `
+                -Property Length `
+                -Sum
+
+        if ($null -eq $measurement.Sum) {
+            return [long]0
+        }
+
+        return [long]$measurement.Sum
+    }
+    catch {
+        return [long]0
+    }
+}
+
 function Invoke-WithTimeout {
     param(
         $Context,
         [string]$FilePath,
         [string]$ArgumentList = '',
         [int]$TimeoutSeconds = 1800,
-        [string]$Name = 'processo'
+        [string]$Name = 'processo',
+        [int]$HeartbeatSeconds = 60,
+        [string]$MonitorPath = ''
     )
-    Write-InstallerLog -Context $Context -Message "Iniciando $Name com timeout de $TimeoutSeconds segundos."
 
-    $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -PassThru -WindowStyle Hidden
-    $finished = $process.WaitForExit($TimeoutSeconds * 1000)
-
-    if (-not $finished) {
-        try { $process.Kill() } catch {}
-        throw "$Name travou ou excedeu o timeout de $TimeoutSeconds segundos. Processo encerrado."
+    if ($HeartbeatSeconds -lt 15) {
+        $HeartbeatSeconds = 15
     }
+
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            "Iniciando $Name com timeout de $TimeoutSeconds segundos. " +
+            "O andamento sera registrado a cada $HeartbeatSeconds " +
+            'segundos.'
+        )
+
+    $process = Start-Process `
+        -FilePath $FilePath `
+        -ArgumentList $ArgumentList `
+        -PassThru `
+        -WindowStyle Hidden
+
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $nextProgressSeconds = $HeartbeatSeconds
+
+    while (-not $process.HasExited) {
+        if ($stopwatch.Elapsed.TotalSeconds -ge $TimeoutSeconds) {
+            try {
+                $process.Kill()
+            }
+            catch {}
+
+            throw (
+                "$Name travou ou excedeu o timeout de " +
+                "$TimeoutSeconds segundos. Processo encerrado."
+            )
+        }
+
+        if (
+            $stopwatch.Elapsed.TotalSeconds -ge
+            $nextProgressSeconds
+        ) {
+            try {
+                $process.Refresh()
+            }
+            catch {}
+
+            $elapsedMinutes = [math]::Round(
+                $stopwatch.Elapsed.TotalMinutes,
+                1
+            )
+
+            $cpuSeconds = 0
+
+            try {
+                $cpuSeconds = [math]::Round(
+                    [double]$process.CPU,
+                    1
+                )
+            }
+            catch {}
+
+            $progressMessage = (
+                "$Name ainda esta em execucao. Tempo decorrido: " +
+                "$elapsedMinutes minuto(s). Processo: " +
+                "$($process.ProcessName), PID $($process.Id), " +
+                "CPU acumulada: $cpuSeconds segundo(s)."
+            )
+
+            if (
+                -not [string]::IsNullOrWhiteSpace(
+                    $MonitorPath
+                )
+            ) {
+                $monitoredBytes = Get-InstallerPathSize `
+                    -Path $MonitorPath
+
+                $progressMessage += (
+                    ' Dados encontrados no caminho monitorado: ' +
+                    (Format-InstallerByteSize `
+                        -Bytes $monitoredBytes) +
+                    '.'
+                )
+            }
+
+            Write-InstallerLog `
+                -Context $Context `
+                -Message $progressMessage
+
+            $nextProgressSeconds += $HeartbeatSeconds
+        }
+
+        Start-Sleep -Seconds 5
+
+        try {
+            $process.Refresh()
+        }
+        catch {}
+    }
+
+    $stopwatch.Stop()
+    $process.WaitForExit()
+
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            "$Name finalizado depois de " +
+            "$([math]::Round($stopwatch.Elapsed.TotalMinutes, 1)) " +
+            "minuto(s). Codigo: $($process.ExitCode)."
+        )
 
     return [int]$process.ExitCode
 }
@@ -875,39 +1195,164 @@ function Save-RemoteFile {
         $Context,
         [string]$Uri,
         [string]$Destination,
-        [int]$TimeoutSeconds = 900
+        [int]$TimeoutSeconds = 900,
+        [int]$HeartbeatSeconds = 60
     )
 
-    Wait-Internet -Context $Context | Out-Null
-    Remove-Item $Destination -Force -ErrorAction SilentlyContinue
-
-    Write-InstallerLog -Context $Context -Message "Baixando arquivo para $Destination"
-
-    $job = Start-Job -ScriptBlock {
-        param($Source, $Target)
-        try {
-            Start-BitsTransfer -Source $Source -Destination $Target -ErrorAction Stop
-        } catch {
-            Invoke-WebRequest -Uri $Source -OutFile $Target -UseBasicParsing -TimeoutSec 600 -ErrorAction Stop
-        }
-    } -ArgumentList $Uri, $Destination
-
-    $finished = Wait-Job -Job $job -Timeout $TimeoutSeconds
-    if (-not $finished) {
-        Stop-Job -Job $job -Force -ErrorAction SilentlyContinue
-        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
-        throw "Download excedeu o timeout de $TimeoutSeconds segundos: $Uri"
+    if ($HeartbeatSeconds -lt 15) {
+        $HeartbeatSeconds = 15
     }
 
+    Wait-Internet -Context $Context | Out-Null
+
+    Remove-Item `
+        -Path $Destination `
+        -Force `
+        -ErrorAction SilentlyContinue
+
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            "Baixando arquivo para $Destination. O andamento sera " +
+            "registrado a cada $HeartbeatSeconds segundos."
+        )
+
+    $job = Start-Job `
+        -ScriptBlock {
+            param($Source, $Target)
+
+            try {
+                Start-BitsTransfer `
+                    -Source $Source `
+                    -Destination $Target `
+                    -ErrorAction Stop
+            }
+            catch {
+                Invoke-WebRequest `
+                    -Uri $Source `
+                    -OutFile $Target `
+                    -UseBasicParsing `
+                    -TimeoutSec 600 `
+                    -ErrorAction Stop
+            }
+        } `
+        -ArgumentList $Uri, $Destination
+
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
+    $nextProgressSeconds = $HeartbeatSeconds
+    $completed = $false
+
     try {
-        Receive-Job -Job $job -ErrorAction Stop | Out-Null
-    } finally {
-        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        while (-not $completed) {
+            $jobState = [string]$job.State
+
+            if ($jobState -in @(
+                'Completed',
+                'Failed',
+                'Stopped',
+                'Disconnected'
+            )) {
+                $completed = $true
+                break
+            }
+
+            if (
+                $stopwatch.Elapsed.TotalSeconds -ge
+                $TimeoutSeconds
+            ) {
+                Stop-Job `
+                    -Job $job `
+                    -Force `
+                    -ErrorAction SilentlyContinue
+
+                throw (
+                    'Download excedeu o timeout de ' +
+                    "$TimeoutSeconds segundos: $Uri"
+                )
+            }
+
+            if (
+                $stopwatch.Elapsed.TotalSeconds -ge
+                $nextProgressSeconds
+            ) {
+                $partialBytes = Get-InstallerPathSize `
+                    -Path $Destination
+
+                Write-InstallerLog `
+                    -Context $Context `
+                    -Message (
+                        'Download ainda esta em andamento. Tempo ' +
+                        'decorrido: ' +
+                        (
+                            [math]::Round(
+                                $stopwatch.Elapsed.TotalMinutes,
+                                1
+                            )
+                        ) +
+                        ' minuto(s). Estado: ' +
+                        "$jobState. Tamanho visivel: " +
+                        (
+                            Format-InstallerByteSize `
+                                -Bytes $partialBytes
+                        ) +
+                        '.'
+                    )
+
+                $nextProgressSeconds += $HeartbeatSeconds
+            }
+
+            Start-Sleep -Seconds 5
+
+            try {
+                $job = Get-Job `
+                    -Id $job.Id `
+                    -ErrorAction Stop
+            }
+            catch {}
+        }
+
+        Receive-Job `
+            -Job $job `
+            -ErrorAction Stop |
+            Out-Null
+    }
+    finally {
+        $stopwatch.Stop()
+
+        Remove-Job `
+            -Job $job `
+            -Force `
+            -ErrorAction SilentlyContinue
     }
 
     if (-not (Test-Path $Destination)) {
-        throw "Download finalizado, mas o arquivo nao foi encontrado: $Destination"
+        throw (
+            'Download finalizado, mas o arquivo nao foi encontrado: ' +
+            $Destination
+        )
     }
+
+    $downloadedBytes = Get-InstallerPathSize `
+        -Path $Destination
+
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            'Download concluido depois de ' +
+            (
+                [math]::Round(
+                    $stopwatch.Elapsed.TotalMinutes,
+                    1
+                )
+            ) +
+            ' minuto(s). Tamanho recebido: ' +
+            (
+                Format-InstallerByteSize `
+                    -Bytes $downloadedBytes
+            ) +
+            '.'
+        ) `
+        -Level Success
 }
 
 function Get-WingetExecutable {
@@ -962,6 +1407,248 @@ function Get-ChocolateyExecutable {
     foreach ($candidate in @($candidates | Where-Object { $_ } | Select-Object -Unique)) {
         if (Test-Path $candidate) { return $candidate }
     }
+
+    return $null
+}
+
+function Install-ChocolateyCli {
+    param($Context)
+
+    $existing = Get-ChocolateyExecutable
+
+    if (
+        -not [string]::IsNullOrWhiteSpace(
+            [string]$existing
+        )
+    ) {
+        Write-InstallerLog `
+            -Context $Context `
+            -Message (
+                'Chocolatey localizado em: ' +
+                [string]$existing
+            ) `
+            -Level Success
+
+        return [string]$existing
+    }
+
+    $installDirectory = Join-Path `
+        $Context.DownloadDirectory `
+        'Chocolatey'
+
+    New-Item `
+        -Path $installDirectory `
+        -ItemType Directory `
+        -Force |
+        Out-Null
+
+    $installScript = Join-Path `
+        $installDirectory `
+        'install-chocolatey.ps1'
+
+    $installSources = @(
+        'https://community.chocolatey.org/install.ps1',
+        'https://chocolatey.org/install.ps1'
+    )
+
+    foreach ($source in $installSources) {
+        try {
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    'Chocolatey nao foi localizado. Preparando pela ' +
+                    "origem oficial: $source"
+                ) `
+                -Level Warning
+
+            Save-RemoteFile `
+                -Context $Context `
+                -Uri $source `
+                -Destination $installScript `
+                -TimeoutSeconds 900
+
+            $scriptItem = Get-Item `
+                -Path $installScript `
+                -ErrorAction Stop
+
+            if ($scriptItem.Length -lt 10000) {
+                throw (
+                    'O script de instalacao do Chocolatey possui ' +
+                    "$($scriptItem.Length) bytes e parece incompleto."
+                )
+            }
+
+            $scriptContent = Get-Content `
+                -Path $installScript `
+                -Raw `
+                -Encoding UTF8
+
+            if ($scriptContent -notmatch 'ChocolateyInstall') {
+                throw (
+                    'O arquivo recebido nao parece ser o instalador ' +
+                    'oficial do Chocolatey.'
+                )
+            }
+
+            Unblock-File `
+                -Path $installScript `
+                -ErrorAction SilentlyContinue
+
+            try {
+                [Net.ServicePointManager]::SecurityProtocol = (
+                    [Net.ServicePointManager]::SecurityProtocol -bor
+                    [Net.SecurityProtocolType]::Tls12
+                )
+            }
+            catch {}
+
+            $previousCompression = (
+                $env:ChocolateyUseWindowsCompression
+            )
+
+            try {
+                $env:ChocolateyUseWindowsCompression = 'true'
+
+                $arguments = (
+                    '-NoLogo -NoProfile -NonInteractive ' +
+                    '-ExecutionPolicy Bypass -File ' +
+                    ('"{0}"' -f $installScript)
+                )
+
+                $exitCode = Invoke-WithTimeout `
+                    -Context $Context `
+                    -FilePath 'powershell.exe' `
+                    -ArgumentList $arguments `
+                    -TimeoutSeconds 1800 `
+                    -Name 'Instalacao do Chocolatey'
+            }
+            finally {
+                $env:ChocolateyUseWindowsCompression = (
+                    $previousCompression
+                )
+            }
+
+            if ($exitCode -notin @(0, 3010)) {
+                throw (
+                    'O instalador do Chocolatey retornou o codigo ' +
+                    "$exitCode."
+                )
+            }
+
+            $chocolateyBin = Join-Path `
+                $env:ProgramData `
+                'chocolatey\bin'
+
+            if (Test-Path $chocolateyBin) {
+                $pathParts = @(
+                    $env:Path -split ';' |
+                        Where-Object {
+                            -not [string]::IsNullOrWhiteSpace($_)
+                        }
+                )
+
+                if ($pathParts -notcontains $chocolateyBin) {
+                    $env:Path = (
+                        ($pathParts + $chocolateyBin) -join ';'
+                    )
+                }
+
+                try {
+                    $machinePath = (
+                        [Environment]::GetEnvironmentVariable(
+                            'Path',
+                            'Machine'
+                        )
+                    )
+
+                    $machineParts = @(
+                        $machinePath -split ';' |
+                            Where-Object {
+                                -not [string]::IsNullOrWhiteSpace($_)
+                            }
+                    )
+
+                    if (
+                        $machineParts -notcontains
+                        $chocolateyBin
+                    ) {
+                        [Environment]::SetEnvironmentVariable(
+                            'Path',
+                            (
+                                ($machineParts + $chocolateyBin) -join
+                                ';'
+                            ),
+                            'Machine'
+                        )
+                    }
+                }
+                catch {
+                    Write-InstallerLog `
+                        -Context $Context `
+                        -Message (
+                            'Chocolatey foi instalado, mas nao foi ' +
+                            'possivel persistir o PATH da maquina: ' +
+                            "$($_.Exception.Message)"
+                        ) `
+                        -Level Warning
+                }
+            }
+
+            $choco = Get-ChocolateyExecutable
+
+            if (
+                [string]::IsNullOrWhiteSpace(
+                    [string]$choco
+                )
+            ) {
+                throw (
+                    'A instalacao terminou, mas choco.exe nao foi ' +
+                    'localizado.'
+                )
+            }
+
+            $validationCode = Invoke-WithTimeout `
+                -Context $Context `
+                -FilePath $choco `
+                -ArgumentList '--version' `
+                -TimeoutSeconds 300 `
+                -Name 'Validacao do Chocolatey'
+
+            if ($validationCode -ne 0) {
+                throw (
+                    'A validacao do Chocolatey retornou o codigo ' +
+                    "$validationCode."
+                )
+            }
+
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    'Chocolatey instalado e validado em: ' +
+                    [string]$choco
+                ) `
+                -Level Success
+
+            return [string]$choco
+        }
+        catch {
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    'Falha ao preparar Chocolatey pela origem ' +
+                    "${source}: $($_.Exception.Message)"
+                ) `
+                -Level Warning
+        }
+    }
+
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            'Chocolatey continua indisponivel. Os metodos direto e ' +
+            'WinGet permanecem disponiveis.'
+        ) `
+        -Level Warning
 
     return $null
 }
@@ -1131,8 +1818,39 @@ function Install-AppFromManifest {
                     if ([string]::IsNullOrWhiteSpace($packageId)) { continue }
 
                     $choco = Get-ChocolateyExecutable
-                    if ([string]::IsNullOrWhiteSpace([string]$choco)) {
-                        Write-InstallerLog -Context $Context -Message "${displayName}: Chocolatey nao esta disponivel; tentando o proximo metodo." -Level Warning
+
+                    if (
+                        [string]::IsNullOrWhiteSpace(
+                            [string]$choco
+                        )
+                    ) {
+                        Write-InstallerLog `
+                            -Context $Context `
+                            -Message (
+                                "${displayName}: Chocolatey nao esta " +
+                                'disponivel. Tentando prepara-lo antes ' +
+                                'de abandonar este metodo.'
+                            ) `
+                            -Level Warning
+
+                        $choco = Install-ChocolateyCli `
+                            -Context $Context
+                    }
+
+                    if (
+                        [string]::IsNullOrWhiteSpace(
+                            [string]$choco
+                        )
+                    ) {
+                        Write-InstallerLog `
+                            -Context $Context `
+                            -Message (
+                                "${displayName}: Chocolatey continua " +
+                                'indisponivel; tentando o proximo ' +
+                                'metodo.'
+                            ) `
+                            -Level Warning
+
                         continue
                     }
 
@@ -1408,7 +2126,27 @@ function Get-AppsPlanejadosPorContexto {
         }
     }
 
-    return @($apps | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+    $uniqueApps = @(
+        $apps |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace($_)
+            } |
+            Select-Object -Unique
+    )
+
+    $applicableApps = @()
+
+    foreach ($app in $uniqueApps) {
+        if (
+            Test-AppApplicableToCurrentDevice `
+                -Context $Context `
+                -Name $app
+        ) {
+            $applicableApps += [string]$app
+        }
+    }
+
+    return @($applicableApps)
 }
 
 function Invoke-AppInstallSet {
@@ -1418,8 +2156,32 @@ function Invoke-AppInstallSet {
         [string]$StageName = 'Aplicativos'
     )
 
-    $apps = @($AppNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
-    foreach ($app in $apps) { Register-RequiredApp -Context $Context -Name $app }
+    $requestedApps = @(
+        $AppNames |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace($_)
+            } |
+            Select-Object -Unique
+    )
+
+    $apps = @()
+
+    foreach ($app in $requestedApps) {
+        if (
+            Test-AppApplicableToCurrentDevice `
+                -Context $Context `
+                -Name $app `
+                -LogDecision
+        ) {
+            $apps += [string]$app
+        }
+    }
+
+    foreach ($app in $apps) {
+        Register-RequiredApp `
+            -Context $Context `
+            -Name $app
+    }
 
     if ($apps.Count -eq 0) {
         Write-InstallerLog -Context $Context -Message "${StageName}: nenhum aplicativo selecionado."

@@ -15,5 +15,10 @@
     "Dell SupportAssist*",
     "SupportAssist*"
   ],
-  "postDetectionTimeoutSeconds": 300
+  "postDetectionTimeoutSeconds": 300,
+  "allowedManufacturers": [
+    "Dell",
+    "Alienware"
+  ],
+  "manufacturerRestrictionMessage": "Dell SupportAssist e aplicavel somente a equipamentos Dell ou Alienware."
 }

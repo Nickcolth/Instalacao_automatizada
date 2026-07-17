@@ -218,7 +218,16 @@ try {
 }
 
 foreach ($app in @(Get-ProfileRequiredAplicativos -Profile $profile)) {
-    Register-RequiredApp -Context $context -Name $app
+    if (
+        Test-AppApplicableToCurrentDevice `
+            -Context $context `
+            -Name $app `
+            -LogDecision
+    ) {
+        Register-RequiredApp `
+            -Context $context `
+            -Name $app
+    }
 }
 
 try {

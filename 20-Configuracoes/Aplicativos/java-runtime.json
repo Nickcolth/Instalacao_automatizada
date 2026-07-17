@@ -30,5 +30,5 @@
   ],
   "wingetPackageId": "Oracle.JavaRuntimeEnvironment",
   "wingetAdditionalArgs": "--architecture x64",
-  "chocolateyPackageId": "javaruntime"
+  "chocolateyPackageId": "jre8"
 }

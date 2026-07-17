@@ -98,26 +98,40 @@ if ($winget) {
     }
 }
 else {
-    Write-InstallerLog -Context $Context -Message 'WinGet ainda nao esta disponivel. Os aplicativos usarao Chocolatey ou instalador direto.' -Level Warning
+    Write-InstallerLog -Context $Context -Message 'WinGet ainda nao esta disponivel. Os aplicativos usarao instalador direto.' -Level Warning
 }
 
-$choco = Get-ChocolateyExecutable
-if (-not $choco) {
-    try {
-        Write-InstallerLog -Context $Context -Message 'Chocolatey nao encontrado. Iniciando instalacao oficial.'
-        $installer = Join-Path $Context.DownloadDirectory 'install-chocolatey.ps1'
-        Save-RemoteFile -Context $Context -Uri 'https://community.chocolatey.org/install.ps1' -Destination $installer -TimeoutSeconds 900
-        $arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$installer`""
-        $exitCode = Invoke-WithTimeout -Context $Context -FilePath 'powershell.exe' -ArgumentList $arguments -TimeoutSeconds 1800 -Name 'Instalacao do Chocolatey'
-        Add-ProcessPathEntry -Entry (Join-Path $env:ProgramData 'chocolatey\bin')
-        $choco = Get-ChocolateyExecutable
-        if ($exitCode -ne 0 -or -not $choco) { throw "Chocolatey nao foi detectado apos a instalacao. Codigo: $exitCode" }
-        Write-InstallerLog -Context $Context -Message "Chocolatey instalado: $choco" -Level Success
-    }
-    catch {
-        Write-InstallerLog -Context $Context -Message "Falha ao instalar Chocolatey: $($_.Exception.Message). O instalador direto continua disponivel." -Level Warning
-    }
+$choco = Install-ChocolateyCli `
+    -Context $Context
+
+if (
+    -not [string]::IsNullOrWhiteSpace(
+        [string]$choco
+    )
+) {
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            'Chocolatey disponivel para uso como metodo alternativo: ' +
+            [string]$choco
+        ) `
+        -Level Success
 }
 else {
-    Write-InstallerLog -Context $Context -Message "Chocolatey ja esta instalado: $choco" -Level Success
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            'Chocolatey nao pode ser preparado nesta rodada. O ' +
+            'instalador continuara com os demais metodos e tentara ' +
+            'prepara-lo novamente quando um aplicativo precisar.'
+        ) `
+        -Level Warning
 }
+
+Write-InstallerLog `
+    -Context $Context `
+    -Message (
+        'Gerenciadores preparados. Cada aplicativo podera utilizar ' +
+        'instalador direto, WinGet e Chocolatey conforme o manifesto.'
+    ) `
+    -Level Success

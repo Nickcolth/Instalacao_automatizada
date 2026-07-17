@@ -16,11 +16,11 @@
   ],
   "postDetectionTimeoutSeconds": 60,
   "packageManagerOrder": [
-    "chocolatey",
+    "direct",
     "winget",
-    "direct"
+    "chocolatey"
   ],
-  "chocolateyPackageId": "7zip",
   "wingetPackageId": "7zip.7zip",
-  "minimumInstallerBytes": 1000000
+  "minimumInstallerBytes": 1000000,
+  "chocolateyPackageId": "7zip"
 }

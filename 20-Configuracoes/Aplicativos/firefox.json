@@ -16,10 +16,10 @@
   ],
   "postDetectionTimeoutSeconds": 120,
   "packageManagerOrder": [
-    "chocolatey",
+    "direct",
     "winget",
-    "direct"
+    "chocolatey"
   ],
-  "chocolateyPackageId": "firefox",
-  "wingetPackageId": "Mozilla.Firefox"
+  "wingetPackageId": "Mozilla.Firefox",
+  "chocolateyPackageId": "firefox"
 }

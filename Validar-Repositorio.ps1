@@ -198,6 +198,128 @@ if (
     )
 }
 
+
+$heartbeatCoreContent = Get-Content `
+    -Path (
+        Join-Path `
+            $root `
+            '10-Nucleo\Instalador.Nucleo.psm1'
+    ) `
+    -Raw `
+    -Encoding UTF8
+
+foreach ($requiredText in @(
+    'HeartbeatSeconds',
+    'ainda esta em execucao',
+    'Download ainda esta em andamento',
+    'Tamanho visivel',
+    'CPU acumulada',
+    'Get-InstallerPathSize'
+)) {
+    if (
+        $heartbeatCoreContent -notmatch
+        [regex]::Escape($requiredText)
+    ) {
+        Add-ValidationError (
+            "Nucleo sem acompanhamento de processo: $requiredText"
+        )
+    }
+}
+
+$heartbeatOfficeContent = Get-Content `
+    -Path (
+        Join-Path `
+            $root `
+            '40-Tarefas\51-Aplicativos-InstalarOffice.ps1'
+    ) `
+    -Raw `
+    -Encoding UTF8
+
+foreach ($requiredText in @(
+    '-HeartbeatSeconds 60',
+    '-MonitorPath $officeFolder'
+)) {
+    if (
+        $heartbeatOfficeContent -notmatch
+        [regex]::Escape($requiredText)
+    ) {
+        Add-ValidationError (
+            "Office sem acompanhamento: $requiredText"
+        )
+    }
+}
+
+
+$supportAssistManifest = Get-Content `
+    -Path (
+        Join-Path `
+            $root `
+            '20-Configuracoes\Aplicativos\supportassist.json'
+    ) `
+    -Raw `
+    -Encoding UTF8 |
+    ConvertFrom-Json
+
+$allowedSupportAssistManufacturers = @(
+    $supportAssistManifest.allowedManufacturers |
+        ForEach-Object { [string]$_ }
+)
+
+foreach ($manufacturer in @('Dell', 'Alienware')) {
+    if (
+        $allowedSupportAssistManufacturers -notcontains
+        $manufacturer
+    ) {
+        Add-ValidationError (
+            'SupportAssist sem fabricante permitido: ' +
+            $manufacturer
+        )
+    }
+}
+
+$manufacturerCoreContent = Get-Content `
+    -Path (
+        Join-Path `
+            $root `
+            '10-Nucleo\Instalador.Nucleo.psm1'
+    ) `
+    -Raw `
+    -Encoding UTF8
+
+foreach ($requiredText in @(
+    'function Get-ComputerManufacturerInfo',
+    'function Test-AppApplicableToCurrentDevice',
+    'allowedManufacturers',
+    'Win32_ComputerSystem',
+    'nao participara da auditoria'
+)) {
+    if (
+        $manufacturerCoreContent -notmatch
+        [regex]::Escape($requiredText)
+    ) {
+        Add-ValidationError (
+            'Restricao por fabricante ausente: ' +
+            $requiredText
+        )
+    }
+}
+
+$manufacturerExecutorContent = Get-Content `
+    -Path (Join-Path $root 'Executar-Instalador.ps1') `
+    -Raw `
+    -Encoding UTF8
+
+if (
+    $manufacturerExecutorContent -notmatch
+    [regex]::Escape(
+        'Test-AppApplicableToCurrentDevice'
+    )
+) {
+    Add-ValidationError (
+        'Executor nao filtra aplicativos pelo fabricante.'
+    )
+}
+
 $getTopdeskPath = Join-Path `
     $root `
     '50-Integracoes\Topdesk\Get_Topdesk.ps1'

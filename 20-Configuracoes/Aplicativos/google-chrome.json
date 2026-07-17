@@ -17,10 +17,10 @@
   ],
   "postDetectionTimeoutSeconds": 120,
   "packageManagerOrder": [
-    "chocolatey",
+    "direct",
     "winget",
-    "direct"
+    "chocolatey"
   ],
-  "chocolateyPackageId": "googlechrome",
-  "wingetPackageId": "Google.Chrome"
+  "wingetPackageId": "Google.Chrome",
+  "chocolateyPackageId": "googlechrome"
 }

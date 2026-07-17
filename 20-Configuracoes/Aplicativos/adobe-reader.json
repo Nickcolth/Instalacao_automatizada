@@ -19,13 +19,13 @@
     3010
   ],
   "downloadTimeoutSeconds": 1800,
-  "installTimeoutSeconds": 3600,
+  "installTimeoutSeconds": 1800,
   "postDetectionTimeoutSeconds": 120,
   "packageManagerOrder": [
-    "chocolatey",
+    "direct",
     "winget",
-    "direct"
+    "chocolatey"
   ],
-  "chocolateyPackageId": "adobereader",
-  "wingetPackageId": "Adobe.Acrobat.Reader.64-bit"
+  "wingetPackageId": "Adobe.Acrobat.Reader.64-bit",
+  "chocolateyPackageId": "adobereader"
 }
