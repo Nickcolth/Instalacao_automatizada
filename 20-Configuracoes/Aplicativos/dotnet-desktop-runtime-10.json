@@ -2,6 +2,7 @@
   "displayName": ".NET Desktop Runtime 10.0.11 (x64)",
   "fileName": "windowsdesktop-runtime-10.0.11-win-x64.exe",
   "silentArgs": "/install /quiet /norestart",
+  "downloadResolverScript": "20-Configuracoes\\Resolvers\\Resolver-DotNetDesktopRuntime10.ps1",
   "detectionPaths": [
     "C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App\\10.0.11"
   ],
