@@ -1217,112 +1217,125 @@ function Save-RemoteFile {
             "registrado a cada $HeartbeatSeconds segundos."
         )
 
-    $job = Start-Job `
-        -ScriptBlock {
-            param($Source, $Target)
-
-            try {
-                Start-BitsTransfer `
-                    -Source $Source `
-                    -Destination $Target `
-                    -ErrorAction Stop
-            }
-            catch {
-                Invoke-WebRequest `
-                    -Uri $Source `
-                    -OutFile $Target `
-                    -UseBasicParsing `
-                    -TimeoutSec 600 `
-                    -ErrorAction Stop
-            }
-        } `
-        -ArgumentList $Uri, $Destination
-
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     $nextProgressSeconds = $HeartbeatSeconds
-    $completed = $false
+    $bitsJob = $null
+    $downloadedWithBits = $false
 
     try {
-        while (-not $completed) {
-            $jobState = [string]$job.State
+        try {
+            $bitsJob = Start-BitsTransfer `
+                -Source $Uri `
+                -Destination $Destination `
+                -Asynchronous `
+                -ErrorAction Stop
 
-            if ($jobState -in @(
-                'Completed',
-                'Failed',
-                'Stopped',
-                'Disconnected'
-            )) {
-                $completed = $true
-                break
+            while ($true) {
+                $bitsJob = Get-BitsTransfer `
+                    -JobId $bitsJob.JobId `
+                    -ErrorAction Stop
+
+                $jobState = [string]$bitsJob.JobState
+
+                if ($jobState -eq 'Transferred') {
+                    Complete-BitsTransfer `
+                        -BitsJob $bitsJob `
+                        -ErrorAction Stop
+
+                    $bitsJob = $null
+                    $downloadedWithBits = $true
+                    break
+                }
+
+                if ($jobState -in @('Error', 'Cancelled')) {
+                    $bitsError = [string]$bitsJob.ErrorDescription
+                    throw "BITS terminou no estado $jobState. $bitsError"
+                }
+
+                if (
+                    $stopwatch.Elapsed.TotalSeconds -ge
+                    $TimeoutSeconds
+                ) {
+                    throw (
+                        'Download excedeu o timeout de ' +
+                        "$TimeoutSeconds segundos: $Uri"
+                    )
+                }
+
+                if (
+                    $stopwatch.Elapsed.TotalSeconds -ge
+                    $nextProgressSeconds
+                ) {
+                    $partialBytes = [long]$bitsJob.BytesTransferred
+
+                    Write-InstallerLog `
+                        -Context $Context `
+                        -Message (
+                            'Download ainda esta em andamento. Tempo ' +
+                            'decorrido: ' +
+                            (
+                                [math]::Round(
+                                    $stopwatch.Elapsed.TotalMinutes,
+                                    1
+                                )
+                            ) +
+                            ' minuto(s). Estado BITS: ' +
+                            "$jobState. Tamanho visivel: " +
+                            (
+                                Format-InstallerByteSize `
+                                    -Bytes $partialBytes
+                            ) +
+                            '.'
+                        )
+
+                    $nextProgressSeconds += $HeartbeatSeconds
+                }
+
+                Start-Sleep -Seconds 5
             }
+        }
+        catch {
+            $bitsMessage = $_.Exception.Message
 
-            if (
-                $stopwatch.Elapsed.TotalSeconds -ge
-                $TimeoutSeconds
-            ) {
-                Stop-Job `
-                    -Job $job `
-                    -Force `
+            if ($null -ne $bitsJob) {
+                Remove-BitsTransfer `
+                    -BitsJob $bitsJob `
+                    -Confirm:$false `
                     -ErrorAction SilentlyContinue
 
-                throw (
-                    'Download excedeu o timeout de ' +
-                    "$TimeoutSeconds segundos: $Uri"
-                )
+                $bitsJob = $null
             }
 
-            if (
-                $stopwatch.Elapsed.TotalSeconds -ge
-                $nextProgressSeconds
-            ) {
-                $partialBytes = Get-InstallerPathSize `
-                    -Path $Destination
+            Remove-Item `
+                -Path $Destination `
+                -Force `
+                -ErrorAction SilentlyContinue
 
-                Write-InstallerLog `
-                    -Context $Context `
-                    -Message (
-                        'Download ainda esta em andamento. Tempo ' +
-                        'decorrido: ' +
-                        (
-                            [math]::Round(
-                                $stopwatch.Elapsed.TotalMinutes,
-                                1
-                            )
-                        ) +
-                        ' minuto(s). Estado: ' +
-                        "$jobState. Tamanho visivel: " +
-                        (
-                            Format-InstallerByteSize `
-                                -Bytes $partialBytes
-                        ) +
-                        '.'
-                    )
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    'BITS nao concluiu o download. Tentando pelo ' +
+                    "cliente web no mesmo processo. Erro: $bitsMessage"
+                ) `
+                -Level Warning
 
-                $nextProgressSeconds += $HeartbeatSeconds
-            }
-
-            Start-Sleep -Seconds 5
-
-            try {
-                $job = Get-Job `
-                    -Id $job.Id `
-                    -ErrorAction Stop
-            }
-            catch {}
+            Invoke-WebRequest `
+                -Uri $Uri `
+                -OutFile $Destination `
+                -UseBasicParsing `
+                -TimeoutSec $TimeoutSeconds `
+                -ErrorAction Stop
         }
-
-        Receive-Job `
-            -Job $job `
-            -ErrorAction Stop |
-            Out-Null
     }
     finally {
         $stopwatch.Stop()
 
-        Remove-Job `
-            -Job $job `
-            -Force `
-            -ErrorAction SilentlyContinue
+        if ($null -ne $bitsJob) {
+            Remove-BitsTransfer `
+                -BitsJob $bitsJob `
+                -Confirm:$false `
+                -ErrorAction SilentlyContinue
+        }
     }
 
     if (-not (Test-Path $Destination)) {
@@ -2585,3 +2598,4 @@ function Invoke-AvisoManualFinalizacao {
 }
 
 Export-ModuleMember -Function *
+
