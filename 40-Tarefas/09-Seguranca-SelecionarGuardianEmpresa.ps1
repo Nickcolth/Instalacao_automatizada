@@ -43,10 +43,14 @@ $manifest = [ordered]@{
         '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /KEY=' + $key
     )
     detectionPaths = @(
-        'C:\Program Files (x86)\MoreApps\GuardianDesk\GuardianDesk.exe',
-        'C:\Program Files (x86)\MoreAplicativos\GuardianDesk\GuardianDesk.exe',
+        'C:\Program Files\MoreApps\Guardian\Desk\GuardianDesk.exe',
+        'C:\Program Files (x86)\MoreApps\Guardian\Desk\GuardianDesk.exe',
+        'C:\Program Files\MoreAplicativos\Guardian\Desk\GuardianDesk.exe',
+        'C:\Program Files (x86)\MoreAplicativos\Guardian\Desk\GuardianDesk.exe',
         'C:\Program Files\MoreApps\GuardianDesk\GuardianDesk.exe',
-        'C:\Program Files\MoreAplicativos\GuardianDesk\GuardianDesk.exe'
+        'C:\Program Files (x86)\MoreApps\GuardianDesk\GuardianDesk.exe',
+        'C:\Program Files\MoreAplicativos\GuardianDesk\GuardianDesk.exe',
+        'C:\Program Files (x86)\MoreAplicativos\GuardianDesk\GuardianDesk.exe'
     )
     successExitCodes = @(
         0,
