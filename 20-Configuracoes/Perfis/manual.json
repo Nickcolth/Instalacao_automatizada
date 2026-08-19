@@ -13,6 +13,7 @@
   ],
   "tarefas": [
     "00-PreValidacao-RemoverAdminUsuarioAtual",
+    "09-Seguranca-SelecionarGuardianEmpresa",
     "10-Seguranca-InstalarAgentesEmpresa",
     "20-Contas-UsuarioImagemEBIOS",
     "30-Inventario-InstalarAgente",
