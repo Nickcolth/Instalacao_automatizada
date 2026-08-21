@@ -1,5 +1,5 @@
 {
-  "descricao": "Execucao completa da tarefa persistente depois que a Area de Trabalho do colaborador estiver pronta. Reconfirma Atlas, Journey, Sophos e Guardian antes das demais tarefas. SupportAssist nao e instalado pelo Intune.",
+  "descricao": "Execucao completa da tarefa persistente depois que a Area de Trabalho do colaborador estiver pronta. Aplica energia no inicio, reconfirma Atlas, Journey, Sophos e Guardian antes das demais tarefas. SupportAssist nao e instalado pelo Intune.",
   "maximoTentativasInstalacao": 3,
   "aplicativosObrigatorios": [
     "google-chrome",
@@ -8,12 +8,12 @@
     "java-runtime"
   ],
   "tarefas": [
+    "40-Sistema-ConfigurarEnergia",
     "00-PreValidacao-RemoverAdminUsuarioAtual",
     "09-Seguranca-SelecionarGuardianEmpresa",
     "10-Seguranca-InstalarAgentesEmpresa",
     "20-Contas-UsuarioImagemEBIOS",
     "30-Inventario-InstalarAgente",
-    "40-Sistema-ConfigurarEnergia",
     "41-Sistema-ConfigurarDiscoDados",
     "42-Sistema-PrepararGerenciadoresPacotes",
     "43-Sistema-DesativarRelatorioErros",
