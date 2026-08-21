@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $officialUrl = (
-    'https://javadl.oracle.com/webapps/download/AutoDL?BundleId=253458_ba687cb3cbb24342adc8fdf890b993dc'
+    'https://javadl.oracle.com/webapps/download/AutoDL?BundleId=253608_2fde65a2208f40a5b5f4c844b0dff092'
 )
 
 $uri = [Uri]$officialUrl
@@ -24,7 +24,7 @@ if (
 Write-InstallerLog `
     -Context $Context `
     -Message (
-        "Usando instalador oficial fixo do Java 8 x64: " +
+        "Usando instalador oficial de contingencia do Java 8 Update 503 x64: " +
         "$officialUrl"
     ) `
     -Level Success

@@ -434,6 +434,8 @@ $hasFailure = (
     $missingFinal.Count -gt 0
 )
 
+Invoke-ManutencaoFinal -Context $context
+
 if ($hasFailure) {
     $missingAppArray = @(
         $missingFinal |
@@ -452,7 +454,6 @@ if ($hasFailure) {
     $finalMessage = "Instalacao finalizada COM PENDENCIAS. Tarefas com erro: $($failedTaskArray -join ', '). Aplicativos pendentes: $($missingAppArray -join ', ')."
     Write-InstallerLog -Context $context -Message $finalMessage -Level Error
     Write-InstallerSummary -Context $context -FinalStatus 'CompletedWithErrors' -MissingAplicativos $missingAppArray -FailedTasks $failedTaskArray
-    Invoke-AvisoManualFinalizacao -Context $context -Status 'Pendencias' -MissingAplicativos $missingAppArray -FailedTasks $failedTaskArray
     Set-Content -Path $context.FailedFlagPath -Value (Get-Date -Format o) -Encoding ASCII -Force
 
     if ($context.IsScheduled) {
@@ -464,6 +465,7 @@ if ($hasFailure) {
         -Message $finalMessage `
         -ExitCode 1
 
+    Invoke-AvisoManualFinalizacao -Context $context -Status 'Pendencias' -MissingAplicativos $missingAppArray -FailedTasks $failedTaskArray
     exit 1
 }
 
@@ -518,6 +520,6 @@ Set-InstallerExecutionState `
     -Completed
 
 Write-InstallerSummary -Context $context -FinalStatus 'Success'
-Invoke-AvisoManualFinalizacao -Context $context -Status 'Sucesso'
 Write-InstallerLog -Context $context -Message 'Instalacao concluida com sucesso.' -Level Success
+Invoke-AvisoManualFinalizacao -Context $context -Status 'Sucesso'
 exit 0
