@@ -2597,5 +2597,56 @@ function Invoke-AvisoManualFinalizacao {
     }
 }
 
-Export-ModuleMember -Function *
+function Invoke-ManutencaoFinal {
+    param($Context)
 
+    if ($null -eq $Context) { return }
+
+    $winget = Get-WingetExecutable
+    if ([string]::IsNullOrWhiteSpace($winget)) {
+        Write-InstallerLog -Context $Context -Message 'Atualizacao final ignorada: winget nao foi encontrado.' -Level Warning
+    }
+    else {
+        try {
+            $wingetExitCode = Invoke-WithTimeout `
+                -Context $Context `
+                -FilePath $winget `
+                -ArgumentList 'upgrade --all --silent --accept-package-agreements --accept-source-agreements --disable-interactivity' `
+                -TimeoutSeconds 7200 `
+                -Name 'atualizacao final de aplicativos pelo winget'
+
+            if ($wingetExitCode -eq 0) {
+                Write-InstallerLog -Context $Context -Message 'Atualizacao final de aplicativos concluida.' -Level Success
+            }
+            else {
+                Write-InstallerLog -Context $Context -Message "Winget upgrade finalizou com codigo $wingetExitCode; a finalizacao continuara normalmente." -Level Warning
+            }
+        }
+        catch {
+            Write-InstallerLog -Context $Context -Message "Falha na atualizacao final pelo winget; a finalizacao continuara normalmente: $($_.Exception.Message)" -Level Warning
+        }
+    }
+
+    if ($Context.Mode -ne 'Manual') { return }
+
+    try {
+        $gpupdateExitCode = Invoke-WithTimeout `
+            -Context $Context `
+            -FilePath (Join-Path $env:SystemRoot 'System32\gpupdate.exe') `
+            -ArgumentList '/force /wait:-1' `
+            -TimeoutSeconds 1800 `
+            -Name 'atualizacao final das politicas de grupo'
+
+        if ($gpupdateExitCode -eq 0) {
+            Write-InstallerLog -Context $Context -Message 'Politicas de grupo atualizadas sem solicitar logoff ou reinicializacao.' -Level Success
+        }
+        else {
+            Write-InstallerLog -Context $Context -Message "Gpupdate finalizou com codigo $gpupdateExitCode; nenhum logoff ou reinicio foi solicitado e a finalizacao continuara normalmente." -Level Warning
+        }
+    }
+    catch {
+        Write-InstallerLog -Context $Context -Message "Falha ao executar gpupdate; nenhum logoff ou reinicio foi solicitado e a finalizacao continuara normalmente: $($_.Exception.Message)" -Level Warning
+    }
+}
+
+Export-ModuleMember -Function *
