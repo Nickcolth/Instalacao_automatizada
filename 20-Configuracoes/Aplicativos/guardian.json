@@ -1,7 +1,7 @@
 {
-  "displayName": "Guardian Desk",
-  "fileName": "GuardianSetup.exe",
-  "silentArgs": "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /ALLUSERS",
+  "displayName": "Guardian Suite GPI 4.1.58",
+  "fileName": "GuardianSetup_4.1.58_GPI.exe",
+  "silentArgs": "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /KEY=GPI-2MPQ-Y2P2-2DJV-B27U",
   "detectionPaths": [
     "C:\\Program Files\\MoreApps\\Guardian\\Desk\\GuardianDesk.exe",
     "C:\\Program Files (x86)\\MoreApps\\Guardian\\Desk\\GuardianDesk.exe",
@@ -22,5 +22,8 @@
     "GuardianDesk*",
     "Guardian Desk*"
   ],
-  "postDetectionTimeoutSeconds": 180
+  "postDetectionTimeoutSeconds": 180,
+  "packageManagerOrder": [
+    "direct"
+  ]
 }
