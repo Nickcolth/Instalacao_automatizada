@@ -6,7 +6,7 @@ $configPath = Join-Path `
     $Context.RepositoryRoot `
     '60-Segredos\topdesk-config.json'
 
-$novoDestino = '\\fileserver\SDK\Softwares\logsenha'
+$novoDestino = '\\fileserver\SDK\Softwares\Instalacao_automatizada\logsenha'
 
 if (-not (Test-Path $configPath)) {
     Write-InstallerLog `
