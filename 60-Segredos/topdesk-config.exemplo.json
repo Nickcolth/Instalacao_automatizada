@@ -7,6 +7,6 @@
   "biosPasswordFieldName": "senha-bios",
   "lapsFieldValue": "Gerenciado via LAPS",
   "createImageAccountAsBackupWhenLapsDetected": true,
-  "networkBackupPath": "\\\\fileserver\\SDK\\Softwares\\logsenha",
+  "networkBackupPath": "\\\\fileserver\\SDK\\Softwares\\Instalacao_automatizada\\logsenha",
   "networkBackupTimeoutSeconds": 5
 }
