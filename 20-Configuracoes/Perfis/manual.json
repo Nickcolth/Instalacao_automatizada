@@ -16,6 +16,7 @@
     "00-PreValidacao-RemoverAdminUsuarioAtual",
     "09-Seguranca-SelecionarGuardianEmpresa",
     "10-Seguranca-InstalarAgentesEmpresa",
+    "19-Contas-ConfigurarDestinoLogSenha",
     "20-Contas-UsuarioImagemEBIOS",
     "30-Inventario-InstalarAgente",
     "41-Sistema-ConfigurarDiscoDados",
