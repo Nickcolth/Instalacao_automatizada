@@ -1,12 +1,13 @@
 param($Context)
 
 # No Intune, Firefox, Adobe Acrobat, Office e SupportAssist nao sao instalados por esta tarefa.
-# O .NET Desktop Runtime 10.0.11 faz parte do conjunto padrao nos dois fluxos.
+# Os .NET Desktop Runtime 8.0.30 e 10.0.11 fazem parte do conjunto padrao nos dois fluxos.
 if ($Context.IsIntune) {
     $appNames = @(
         '7zip',
         'google-chrome',
         'java-runtime',
+        'dotnet-desktop-runtime-8',
         'dotnet-desktop-runtime-10'
     )
 } else {
@@ -17,6 +18,7 @@ if ($Context.IsIntune) {
         'firefox',
         'supportassist',
         'java-runtime',
+        'dotnet-desktop-runtime-8',
         'dotnet-desktop-runtime-10'
     )
 }
