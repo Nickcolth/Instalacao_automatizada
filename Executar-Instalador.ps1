@@ -179,7 +179,76 @@ $failedTasks = @()
 Write-InstallerLog -Context $context -Message "Inicio da instalacao. Versao: $PackageVersion. Modo: $Mode. Usuario: $env:USERNAME. Computador: $env:COMPUTERNAME. IsIntune: $($context.IsIntune). IsScheduled: $($context.IsScheduled). Maximo de tentativas para apps: $MaxInstallAttempts."
 
 try {
-    Assert-UsuarioPermitido -Context $context -BlockedUserNames @('Imagem')
+    $imagemEmUso = Test-ExecucaoUsuarioBloqueado `
+        -BlockedUserNames @('Imagem')
+
+    if ($imagemEmUso) {
+        $empresaDoEquipamento = Get-EmpresaAppsPorNomeEquipamento `
+            -Context $context
+
+        $nomeValido = (
+            $null -ne $empresaDoEquipamento -and
+            [bool]$empresaDoEquipamento.Reconhecida -and
+            -not [string]::IsNullOrWhiteSpace(
+                [string]$empresaDoEquipamento.Prefixo
+            )
+        )
+
+        if ($nomeValido) {
+            Remove-Item `
+                -Path (
+                    Join-Path `
+                        $context.FlagDirectory `
+                        'bloqueado_usuario_imagem.flag'
+                ) `
+                -Force `
+                -ErrorAction SilentlyContinue
+
+            Write-InstallerLog `
+                -Context $context `
+                -Message (
+                    "Execucao pelo usuario Imagem liberada. " +
+                    "Equipamento '$env:COMPUTERNAME' reconhecido como " +
+                    "'$($empresaDoEquipamento.Nome)' pelo prefixo " +
+                    "'$($empresaDoEquipamento.Prefixo)'."
+                ) `
+                -Level Success
+        }
+        else {
+            $message = (
+                "Execucao pelo usuario Imagem bloqueada porque o " +
+                "equipamento '$env:COMPUTERNAME' ainda nao possui um " +
+                'prefixo valido de empresa do grupo. Renomeie o notebook ' +
+                'com um dos prefixos cadastrados em empresas.json e ' +
+                'execute novamente.'
+            )
+
+            try {
+                Show-AvisoUsuarioBloqueado `
+                    -Message $message `
+                    -Title 'Instalador bloqueado - nome do equipamento'
+            }
+            catch {}
+
+            New-Item `
+                -Path $context.FlagDirectory `
+                -ItemType Directory `
+                -Force |
+                Out-Null
+
+            Set-Content `
+                -Path (
+                    Join-Path `
+                        $context.FlagDirectory `
+                        'bloqueado_usuario_imagem.flag'
+                ) `
+                -Value (Get-Date -Format o) `
+                -Encoding ASCII `
+                -Force
+
+            throw $message
+        }
+    }
 } catch {
     Write-InstallerLog -Context $context -Message "Execucao bloqueada por usuario nao permitido: $($_.Exception.Message)" -Level Error
     Add-InstallerResult -Context $context -Type 'preflight' -Name 'Assert-UsuarioPermitido' -Status 'Blocked' -Message $_.Exception.Message
