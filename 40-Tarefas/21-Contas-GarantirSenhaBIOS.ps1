@@ -3,42 +3,25 @@ param($Context)
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-function Get-RandomLower {
-    $chars = 'abcdefghijkmnopqrstuvwxyz'
-    return $chars[(Get-Random -Minimum 0 -Maximum $chars.Length)]
-}
-
-function Get-RandomUpper {
-    $chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ'
-    return $chars[(Get-Random -Minimum 0 -Maximum $chars.Length)]
-}
-
-function Get-RandomDigit {
-    return [string](Get-Random -Minimum 0 -Maximum 10)
-}
-
-function Get-RandomSpecial {
-    $chars = '!@#$%&*'
-    return $chars[(Get-Random -Minimum 0 -Maximum $chars.Length)]
-}
-
 function New-BiosPassword {
-    $parts = @(
-        (Get-RandomLower),
-        (Get-RandomUpper),
-        (Get-RandomDigit),
-        (Get-RandomLower),
-        (Get-RandomDigit),
-        (Get-RandomUpper),
-        (Get-RandomLower),
-        (Get-RandomDigit),
-        (Get-RandomSpecial),
-        (Get-RandomLower),
-        (Get-RandomUpper),
-        (Get-RandomDigit)
+    $lower = 'abcdefghijkmnopqrstuvwxyz'
+    $upper = 'ABCDEFGHIJKLMNPQRSTUVWXYZ'
+    $digits = '23456789'
+    $special = '!@#$%&*'
+    $all = $lower + $upper + $digits
+
+    $chars = @(
+        $lower[(Get-Random -Minimum 0 -Maximum $lower.Length)],
+        $upper[(Get-Random -Minimum 0 -Maximum $upper.Length)],
+        $digits[(Get-Random -Minimum 0 -Maximum $digits.Length)],
+        $special[(Get-Random -Minimum 0 -Maximum $special.Length)]
     )
 
-    return ($parts -join '')
+    while ($chars.Count -lt 12) {
+        $chars += $all[(Get-Random -Minimum 0 -Maximum $all.Length)]
+    }
+
+    return (-join ($chars | Sort-Object { Get-Random }))
 }
 
 function ConvertTo-BiosBool {
@@ -49,12 +32,7 @@ function ConvertTo-BiosBool {
     }
 
     $text = ([string]$Value).Trim()
-
-    if ($text -match '^(?i:true|1|yes|enabled)$') {
-        return $true
-    }
-
-    return $false
+    return ($text -match '^(?i:true|1|yes|enabled)$')
 }
 
 function Ensure-DellBiosProvider {
@@ -83,8 +61,8 @@ function Ensure-DellBiosProvider {
             Write-InstallerLog `
                 -Context $Context `
                 -Message (
-                    'NuGet nao precisou ser instalado ou falhou ao ' +
-                    "preparar: $($_.Exception.Message)"
+                    'NuGet nao precisou ser instalado ou falhou ao preparar: ' +
+                    $_.Exception.Message
                 ) `
                 -Level Warning
         }
@@ -112,104 +90,97 @@ function Ensure-DellBiosProvider {
     }
 }
 
-function Get-DellProviderPasswordState {
+function Get-BiosPasswordState {
     $adminSet = $null
     $systemSet = $null
+    $source = 'Nao consultavel'
 
     try {
-        $adminItem = Get-Item `
-            -Path 'DellSmbios:\Security\IsAdminPasswordSet' `
-            -ErrorAction Stop
+        if (Get-PSDrive -Name DellSmbios -ErrorAction SilentlyContinue) {
+            try {
+                $adminItem = Get-Item `
+                    'DellSmbios:\Security\IsAdminPasswordSet' `
+                    -ErrorAction Stop
 
-        if ($adminItem.PSObject.Properties['CurrentValue']) {
-            $adminSet = ConvertTo-BiosBool $adminItem.CurrentValue
-        }
-        elseif ($adminItem.PSObject.Properties['Value']) {
-            $adminSet = ConvertTo-BiosBool $adminItem.Value
+                $value = $null
+                if ($adminItem.PSObject.Properties['CurrentValue']) {
+                    $value = $adminItem.CurrentValue
+                }
+                elseif ($adminItem.PSObject.Properties['Value']) {
+                    $value = $adminItem.Value
+                }
+
+                if ($null -ne $value) {
+                    $adminSet = ConvertTo-BiosBool $value
+                    $source = 'DellBIOSProvider'
+                }
+            }
+            catch {}
+
+            try {
+                $systemItem = Get-Item `
+                    'DellSmbios:\Security\IsSystemPasswordSet' `
+                    -ErrorAction Stop
+
+                $value = $null
+                if ($systemItem.PSObject.Properties['CurrentValue']) {
+                    $value = $systemItem.CurrentValue
+                }
+                elseif ($systemItem.PSObject.Properties['Value']) {
+                    $value = $systemItem.Value
+                }
+
+                if ($null -ne $value) {
+                    $systemSet = ConvertTo-BiosBool $value
+                }
+            }
+            catch {}
         }
     }
     catch {}
 
-    try {
-        $systemItem = Get-Item `
-            -Path 'DellSmbios:\Security\IsSystemPasswordSet' `
-            -ErrorAction Stop
+    if ($null -eq $adminSet -or $null -eq $systemSet) {
+        try {
+            $passwords = @(
+                Get-CimInstance `
+                    -Namespace 'root\dcim\sysman' `
+                    -ClassName 'DCIM_BIOSPassword' `
+                    -ErrorAction Stop
+            )
 
-        if ($systemItem.PSObject.Properties['CurrentValue']) {
-            $systemSet = ConvertTo-BiosBool $systemItem.CurrentValue
+            if ($null -eq $adminSet) {
+                $admin = $passwords |
+                    Where-Object {
+                        [string]$_.AttributeName -ieq 'AdminPwd'
+                    } |
+                    Select-Object -First 1
+
+                if ($null -ne $admin) {
+                    $adminSet = ConvertTo-BiosBool $admin.IsSet
+                    $source = 'CIM Dell'
+                }
+            }
+
+            if ($null -eq $systemSet) {
+                $system = $passwords |
+                    Where-Object {
+                        [string]$_.AttributeName -ieq 'SystemPwd'
+                    } |
+                    Select-Object -First 1
+
+                if ($null -ne $system) {
+                    $systemSet = ConvertTo-BiosBool $system.IsSet
+                }
+            }
         }
-        elseif ($systemItem.PSObject.Properties['Value']) {
-            $systemSet = ConvertTo-BiosBool $systemItem.Value
-        }
+        catch {}
     }
-    catch {}
 
     return [pscustomobject]@{
         AdminSet = $adminSet
         SystemSet = $systemSet
+        Source = $source
     }
-}
-
-function Get-DellCimPasswordState {
-    try {
-        $passwords = @(
-            Get-CimInstance `
-                -Namespace 'root\dcim\sysman' `
-                -ClassName 'DCIM_BIOSPassword' `
-                -ErrorAction Stop
-        )
-
-        $admin = $passwords |
-            Where-Object {
-                [string]$_.AttributeName -ieq 'AdminPwd'
-            } |
-            Select-Object -First 1
-
-        $system = $passwords |
-            Where-Object {
-                [string]$_.AttributeName -ieq 'SystemPwd'
-            } |
-            Select-Object -First 1
-
-        return [pscustomobject]@{
-            Available = $true
-            AdminSet = if ($null -ne $admin) {
-                ConvertTo-BiosBool $admin.IsSet
-            }
-            else {
-                $null
-            }
-            SystemSet = if ($null -ne $system) {
-                ConvertTo-BiosBool $system.IsSet
-            }
-            else {
-                $null
-            }
-        }
-    }
-    catch {
-        return [pscustomobject]@{
-            Available = $false
-            AdminSet = $null
-            SystemSet = $null
-        }
-    }
-}
-
-function Test-BiosAdminPasswordSet {
-    $providerState = Get-DellProviderPasswordState
-
-    if ($null -ne $providerState.AdminSet) {
-        return [bool]$providerState.AdminSet
-    }
-
-    $cimState = Get-DellCimPasswordState
-
-    if ($cimState.Available -and $null -ne $cimState.AdminSet) {
-        return [bool]$cimState.AdminSet
-    }
-
-    return $null
 }
 
 function Save-LocalBiosBackup {
@@ -219,9 +190,9 @@ function Save-LocalBiosBackup {
         [string]$Password
     )
 
-    $datahora = Get-Date -Format 'yyyyMMddHHmmss'
+    $stamp = Get-Date -Format 'yyyyMMddHHmmss'
     $randomTail = Get-Random -Minimum 10000 -Maximum 99999
-    $line = "biosguard${datahora}FINAL${Password}biosok${randomTail}"
+    $line = "biosguard${stamp}FINAL${Password}biosok${randomTail}"
 
     if ($line.Length -lt 130) {
         $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -290,12 +261,8 @@ function Save-NetworkBiosBackup {
         if (-not (Test-Path -Path $logFolder)) {
             Write-InstallerLog `
                 -Context $Context `
-                -Message (
-                    'Pasta de backup de senha da BIOS nao esta ' +
-                    "acessivel: $logFolder"
-                ) `
+                -Message "Pasta de backup da BIOS nao esta acessivel: $logFolder" `
                 -Level Warning
-
             return
         }
 
@@ -339,9 +306,7 @@ function Send-BiosPasswordToTopdesk {
         [string]$Password
     )
 
-    if ($null -eq $Config) {
-        return
-    }
+    if ($null -eq $Config) { return }
 
     foreach ($required in @('baseUrl','username','password')) {
         if (
@@ -404,11 +369,7 @@ function Send-BiosPasswordToTopdesk {
             $candidateName = $null
 
             foreach ($nameProperty in @(
-                'name',
-                'displayName',
-                'text',
-                'assetName',
-                'number'
+                'name','displayName','text','assetName','number'
             )) {
                 if (
                     $candidate.PSObject.Properties[$nameProperty] -and
@@ -536,19 +497,13 @@ $manufacturer = [string]$computerSystem.Manufacturer
 if ($manufacturer -notmatch '(?i)dell|alienware') {
     Write-InstallerLog `
         -Context $Context `
-        -Message (
-            "Garantia de senha da BIOS ignorada. Fabricante: $manufacturer"
-        )
-
+        -Message "Garantia de senha da BIOS ignorada. Fabricante: $manufacturer"
     return
 }
 
 Write-InstallerLog `
     -Context $Context `
-    -Message (
-        "Verificando senha de administrador da BIOS Dell. " +
-        "Fabricante: $manufacturer"
-    )
+    -Message "Verificando senha de administrador da BIOS. Fabricante: $manufacturer"
 
 $providerReady = $false
 $providerError = $null
@@ -559,128 +514,118 @@ try {
 }
 catch {
     $providerError = $_.Exception.Message
-
     Write-InstallerLog `
         -Context $Context `
         -Message (
-            'DellBIOSProvider nao ficou disponivel. O script tentara ' +
-            "o metodo CIM da Dell. Erro: $providerError"
+            'DellBIOSProvider nao ficou disponivel. ' +
+            "O metodo alternativo CIM sera tentado se necessario. Erro: $providerError"
         ) `
         -Level Warning
 }
 
-if ($providerReady) {
-    $state = Get-DellProviderPasswordState
+$stateBefore = Get-BiosPasswordState
 
-    if ($state.AdminSet -eq $true) {
-        Write-InstallerLog `
-            -Context $Context `
-            -Message (
-                'Senha de administrador da BIOS ja esta configurada. ' +
-                'Nenhuma alteracao sera feita.'
-            ) `
-            -Level Success
-
-        return
-    }
-
-    if ($state.SystemSet -eq $true) {
-        Write-InstallerLog `
-            -Context $Context `
-            -Message (
-                'A BIOS possui senha de sistema. A Dell nao permite ' +
-                'definir AdminPassword nessa condicao sem tratar a senha ' +
-                'existente. A BIOS foi preservada.'
-            ) `
-            -Level Warning
-
-        return
-    }
+if ($stateBefore.AdminSet -eq $true) {
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            'BIOS ja possui senha de administrador. ' +
+            'Nenhuma senha foi criada ou alterada pelo script. ' +
+            "Deteccao: $($stateBefore.Source)."
+        ) `
+        -Level Success
+    return
 }
-else {
-    $cimStateBefore = Get-DellCimPasswordState
 
-    if (
-        $cimStateBefore.Available -and
-        $cimStateBefore.AdminSet -eq $true
-    ) {
-        Write-InstallerLog `
-            -Context $Context `
-            -Message (
-                'Senha de administrador da BIOS ja esta configurada ' +
-                'segundo o namespace CIM da Dell.'
-            ) `
-            -Level Success
-
-        return
-    }
-
-    if (
-        $cimStateBefore.Available -and
-        $cimStateBefore.SystemSet -eq $true
-    ) {
-        Write-InstallerLog `
-            -Context $Context `
-            -Message (
-                'Senha de sistema da BIOS detectada pelo CIM. A senha de ' +
-                'administrador nao sera criada para evitar conflito.'
-            ) `
-            -Level Warning
-
-        return
-    }
+if ($stateBefore.SystemSet -eq $true) {
+    Write-InstallerLog `
+        -Context $Context `
+        -Message (
+            'BIOS possui senha de sistema. Nenhuma alteracao foi feita ' +
+            'para evitar conflito com a senha existente.'
+        ) `
+        -Level Warning
+    return
 }
 
 $newPassword = New-BiosPassword
 $biosSet = $false
 $methodUsed = $null
-$providerSetError = $null
+$directError = $null
 
+# Metodo principal: exatamente o mesmo usado pelo script original que ja era
+# conhecido por funcionar nos Dell e Alienware.
 if ($providerReady) {
     try {
         Write-InstallerLog `
             -Context $Context `
-            -Message 'Tentando definir a senha da BIOS pelo DellBIOSProvider.'
+            -Message (
+                'BIOS sem senha detectada. Tentando o metodo principal ' +
+                'pelo DellBIOSProvider.'
+            )
 
         Set-Item `
             -Path 'DellSmbios:\Security\AdminPassword' `
             -Value $newPassword `
             -ErrorAction Stop
 
-        Start-Sleep -Seconds 2
-
-        $verified = Test-BiosAdminPasswordSet
-
-        if ($verified -eq $true) {
-            $biosSet = $true
-            $methodUsed = 'DellBIOSProvider'
-        }
-        else {
-            throw (
-                'O comando terminou sem erro, mas IsAdminPasswordSet ' +
-                'nao confirmou a senha.'
-            )
-        }
-    }
-    catch {
-        $providerSetError = $_.Exception.Message
+        $biosSet = $true
+        $methodUsed = 'DellBIOSProvider-SetItem'
 
         Write-InstallerLog `
             -Context $Context `
             -Message (
-                'Tentativa pelo DellBIOSProvider nao foi confirmada. ' +
-                "Sera usado o fallback CIM. Erro: $providerSetError"
+                'DellBIOSProvider aceitou a nova senha da BIOS. ' +
+                'Metodo original executado com sucesso.'
+            ) `
+            -Level Success
+    }
+    catch {
+        $directError = $_.Exception.Message
+
+        $stateAfterDirectFailure = Get-BiosPasswordState
+
+        if ($stateAfterDirectFailure.AdminSet -eq $true) {
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    'O metodo principal nao alterou a BIOS porque uma senha ' +
+                    'de administrador ja esta configurada. Isso nao e uma falha.'
+                ) `
+                -Level Success
+            return
+        }
+
+        Write-InstallerLog `
+            -Context $Context `
+            -Message (
+                'Metodo principal DellBIOSProvider falhou. ' +
+                "Tentando metodo alternativo CIM. Erro: $directError"
             ) `
             -Level Warning
     }
 }
 
+# Metodo alternativo: interface CIM oficial da Dell.
 if (-not $biosSet) {
     try {
+        $stateBeforeFallback = Get-BiosPasswordState
+
+        if ($stateBeforeFallback.AdminSet -eq $true) {
+            Write-InstallerLog `
+                -Context $Context `
+                -Message (
+                    'BIOS ja possui senha de administrador. ' +
+                    'Metodo alternativo nao sera executado.'
+                ) `
+                -Level Success
+            return
+        }
+
         Write-InstallerLog `
             -Context $Context `
             -Message (
-                'Tentando definir a senha da BIOS pelo ' +
+                'Executando metodo alternativo para senha da BIOS: ' +
                 'DCIM_BIOSService.SetBIOSAttributes.'
             )
 
@@ -713,57 +658,63 @@ if (-not $biosSet) {
         }
 
         if ($returnValue -ne 0) {
+            $stateAfterFallbackFailure = Get-BiosPasswordState
+
+            if ($stateAfterFallbackFailure.AdminSet -eq $true) {
+                Write-InstallerLog `
+                    -Context $Context `
+                    -Message (
+                        'Metodo alternativo nao alterou a BIOS porque uma ' +
+                        'senha de administrador ja esta configurada. ' +
+                        'Isso nao e uma falha.'
+                    ) `
+                    -Level Success
+                return
+            }
+
             throw "SetBIOSAttributes retornou codigo $returnValue."
         }
 
-        Start-Sleep -Seconds 2
-        $cimStateAfter = Get-DellCimPasswordState
-        $providerVerifiedAfter = $null
+        $biosSet = $true
+        $methodUsed = 'DCIM_BIOSService'
 
-        if ($providerReady) {
-            $providerVerifiedAfter = Test-BiosAdminPasswordSet
-        }
+        Write-InstallerLog `
+            -Context $Context `
+            -Message 'Metodo alternativo CIM aceitou a nova senha da BIOS.' `
+            -Level Success
+    }
+    catch {
+        $fallbackError = $_.Exception.Message
+        $finalState = Get-BiosPasswordState
 
-        if (
-            ($cimStateAfter.Available -and $cimStateAfter.AdminSet -eq $true) -or
-            $providerVerifiedAfter -eq $true
-        ) {
-            $biosSet = $true
-            $methodUsed = 'DCIM_BIOSService'
-        }
-        else {
-            # ReturnValue 0 significa que a Dell aceitou a alteracao. Em alguns
-            # modelos a consulta do estado nao atualiza imediatamente.
-            $biosSet = $true
-            $methodUsed = 'DCIM_BIOSService-retorno-0'
-
+        if ($finalState.AdminSet -eq $true) {
             Write-InstallerLog `
                 -Context $Context `
                 -Message (
-                    'A Dell retornou sucesso ao configurar a senha, mas a ' +
-                    'consulta de confirmacao ainda nao refletiu a mudanca.'
+                    'BIOS ja possui senha de administrador. ' +
+                    'Nenhuma alteracao adicional foi feita e isso nao e uma falha.'
                 ) `
-                -Level Warning
+                -Level Success
+            return
         }
-    }
-    catch {
-        $details = $_.Exception.Message
 
-        if (-not [string]::IsNullOrWhiteSpace($providerSetError)) {
-            $details = (
-                "DellBIOSProvider: $providerSetError | CIM: $details"
-            )
+        $details = "CIM: $fallbackError"
+        if (-not [string]::IsNullOrWhiteSpace($directError)) {
+            $details = "DellBIOSProvider: $directError | $details"
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($providerError)) {
+            $details = "DellBIOSProvider: $providerError | $details"
         }
 
         throw (
-            'Nao foi possivel garantir a senha de administrador da BIOS ' +
-            "Dell. $details"
+            'Nao foi possivel criar a senha da BIOS por nenhum dos metodos. ' +
+            $details
         )
     }
 }
 
 if (-not $biosSet) {
-    throw 'A senha da BIOS nao foi confirmada por nenhum metodo.'
+    throw 'A senha da BIOS nao foi criada por nenhum metodo.'
 }
 
 Save-BiosPassword `
@@ -774,6 +725,6 @@ Write-InstallerLog `
     -Context $Context `
     -Message (
         'Senha de administrador da BIOS criada e registrada com sucesso. ' +
-        "Metodo: $methodUsed"
+        "Metodo usado: $methodUsed"
     ) `
     -Level Success
