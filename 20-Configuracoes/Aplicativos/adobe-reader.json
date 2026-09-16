@@ -22,8 +22,8 @@
   "installTimeoutSeconds": 1800,
   "postDetectionTimeoutSeconds": 120,
   "packageManagerOrder": [
-    "direct",
     "winget",
+    "direct",
     "chocolatey"
   ],
   "wingetPackageId": "Adobe.Acrobat.Reader.64-bit",
