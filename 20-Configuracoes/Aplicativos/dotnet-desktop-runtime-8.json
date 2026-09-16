@@ -1,13 +1,13 @@
 {
-  "displayName": ".NET Desktop Runtime 8.0.30 (x64)",
-  "fileName": "windowsdesktop-runtime-8.0.30-win-x64.exe",
+  "displayName": ".NET Desktop Runtime 8.0.31 (x64)",
+  "fileName": "windowsdesktop-runtime-8.0.31-win-x64.exe",
   "silentArgs": "/install /quiet /norestart",
   "downloadResolverScript": "20-Configuracoes\\Resolvers\\Resolver-DotNetDesktopRuntime8.ps1",
   "detectionPaths": [
-    "C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App\\8.0.30"
+    "C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App\\8.0.31"
   ],
   "detectionRegistryDisplayNames": [
-    "Microsoft Windows Desktop Runtime - 8.0.30*"
+    "Microsoft Windows Desktop Runtime - 8.0.31*"
   ],
   "successExitCodes": [
     0,
@@ -23,5 +23,5 @@
     "winget"
   ],
   "wingetPackageId": "Microsoft.DotNet.DesktopRuntime.8",
-  "wingetAdditionalArgs": "--version 8.0.30 --architecture x64"
+  "wingetAdditionalArgs": "--version 8.0.31 --architecture x64"
 }
