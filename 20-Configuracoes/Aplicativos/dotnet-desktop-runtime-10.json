@@ -1,13 +1,13 @@
 {
-  "displayName": ".NET Desktop Runtime 10.0.12 (x64)",
+  "displayName": ".NET Desktop Runtime 10 (x64)",
   "fileName": "windowsdesktop-runtime-10.0.12-win-x64.exe",
   "silentArgs": "/install /quiet /norestart",
   "downloadResolverScript": "20-Configuracoes\\Resolvers\\Resolver-DotNetDesktopRuntime10.ps1",
   "detectionPaths": [
-    "C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App\\10.0.12"
+    "C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App\\10.0.*"
   ],
   "detectionRegistryDisplayNames": [
-    "Microsoft Windows Desktop Runtime - 10.0.12*"
+    "Microsoft Windows Desktop Runtime - 10.0.*"
   ],
   "successExitCodes": [
     0,
@@ -19,9 +19,9 @@
   "postDetectionTimeoutSeconds": 180,
   "minimumInstallerBytes": 10000000,
   "packageManagerOrder": [
-    "direct",
-    "winget"
+    "winget",
+    "direct"
   ],
   "wingetPackageId": "Microsoft.DotNet.DesktopRuntime.10",
-  "wingetAdditionalArgs": "--version 10.0.12 --architecture x64"
+  "wingetAdditionalArgs": "--architecture x64"
 }
