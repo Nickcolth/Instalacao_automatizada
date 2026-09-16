@@ -1,7 +1,7 @@
 param($Context, $Manifest, [string]$Name)
 
 $metadataUrl = 'https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json'
-$targetVersion = '10.0.11'
+$targetVersion = '10.0.12'
 
 Write-InstallerLog -Context $Context -Message "Consultando metadata oficial do .NET para localizar o Desktop Runtime $targetVersion x64."
 
