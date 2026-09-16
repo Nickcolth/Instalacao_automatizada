@@ -16,8 +16,8 @@
   ],
   "postDetectionTimeoutSeconds": 60,
   "packageManagerOrder": [
-    "direct",
     "winget",
+    "direct",
     "chocolatey"
   ],
   "wingetPackageId": "7zip.7zip",
