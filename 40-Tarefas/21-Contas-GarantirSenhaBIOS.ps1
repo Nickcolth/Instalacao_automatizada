@@ -541,11 +541,10 @@ if ($stateBefore.SystemSet -eq $true) {
     Write-InstallerLog `
         -Context $Context `
         -Message (
-            'BIOS possui senha de sistema. Nenhuma alteracao foi feita ' +
-            'para evitar conflito com a senha existente.'
+            'Senha de sistema detectada, mas nenhuma senha Admin foi ' +
+            'confirmada. O script tentara criar AdminPassword normalmente.'
         ) `
         -Level Warning
-    return
 }
 
 $newPassword = New-BiosPassword
