@@ -1,6 +1,6 @@
 {
-  "displayName": "Guardian Suite GPI 4.1.58",
-  "fileName": "GuardianSetup_4.1.58_GPI.exe",
+  "displayName": "Guardian Suite GPI 4.1.62",
+  "fileName": "GuardianSetup_4.1.62_GPI.exe",
   "silentArgs": "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /KEY=GPI-2MPQ-Y2P2-2DJV-B27U",
   "detectionPaths": [
     "C:\\Program Files\\MoreApps\\Guardian\\Desk\\GuardianDesk.exe",
