@@ -7,6 +7,35 @@ $ErrorActionPreference = 'Stop'
 # HKCU do SYSTEM nao e o registro do colaborador; usar HKEY_USERS.
 $relativePath = 'Software\Policies\Microsoft\Office\16.0\Outlook\Cached Mode'
 
+# Active Setup: configura o Outlook no primeiro login de cada usuario.
+# Isso tambem cobre perfis criados depois da preparacao do computador.
+$activeSetupKeyPath = 'SOFTWARE\Microsoft\Active Setup\Installed Components\{E1F1D1A0-5A39-49D8-9F1D-BA9A98E7BFD0}'
+$stubPath = 'reg.exe add "HKCU\Software\Policies\Microsoft\Office\16.0\Outlook\Cached Mode" /v SyncWindowSetting /t REG_DWORD /d 0 /f'
+$baseKey = $null
+$activeSetupKey = $null
+
+try {
+    $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+        [Microsoft.Win32.RegistryHive]::LocalMachine,
+        [Microsoft.Win32.RegistryView]::Registry64
+    )
+    $activeSetupKey = $baseKey.CreateSubKey($activeSetupKeyPath, $true)
+    if ($null -eq $activeSetupKey) {
+        throw 'Nao foi possivel criar a chave do Active Setup.'
+    }
+    $activeSetupKey.SetValue('Version', '1,0,0,0', [Microsoft.Win32.RegistryValueKind]::String)
+    $activeSetupKey.SetValue('StubPath', $stubPath, [Microsoft.Win32.RegistryValueKind]::String)
+    $activeSetupKey.SetValue('IsInstalled', 1, [Microsoft.Win32.RegistryValueKind]::DWord)
+}
+finally {
+    if ($null -ne $activeSetupKey) { $activeSetupKey.Dispose() }
+    if ($null -ne $baseKey) { $baseKey.Dispose() }
+}
+
+Write-InstallerLog -Context $Context `
+    -Message 'Outlook: Active Setup registrado para configurar perfis futuros no primeiro login.' `
+    -Level Success
+
 $profiles = @(
     Get-CimInstance -ClassName Win32_UserProfile -ErrorAction Stop |
         Where-Object { -not $_.Special -and $_.Loaded -and $_.SID }
@@ -38,7 +67,9 @@ foreach ($profile in $profiles) {
 }
 
 if ($configured -eq 0) {
-    throw 'Nenhum perfil de usuario carregado recebeu a configuracao do Outlook.'
+    Write-InstallerLog -Context $Context `
+        -Message 'Nenhum perfil carregado. Active Setup aplicara a configuracao no proximo login.' `
+        -Level Warning
 }
 
 Write-InstallerLog -Context $Context `
