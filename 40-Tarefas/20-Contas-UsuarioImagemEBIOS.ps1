@@ -3,6 +3,27 @@ param($Context)
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
+function Test-ImagemEmSessao {
+    param([string]$NomeConta)
+    $nomes = @()
+    try { $nomes += [Security.Principal.WindowsIdentity]::GetCurrent().Name } catch {}
+    if ($env:USERNAME) { $nomes += $env:USERNAME }
+    try {
+        $sessaoConsole = (Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).UserName
+        if ($sessaoConsole) { $nomes += $sessaoConsole }
+    } catch {}
+    try {
+        foreach ($linha in @(quser.exe 2>$null)) {
+            if ([string]$linha -match '^\s*>?\s*([^\s]+)\s+') { $nomes += $Matches[1] }
+        }
+    } catch {}
+    foreach ($nome in $nomes) {
+        $usuario = (([string]$nome -split '\\')[-1] -split '@')[0]
+        if ($usuario -ieq $NomeConta) { return $true }
+    }
+    return $false
+}
+
 function Get-RegistryIntValue {
     param([object]$Object, [string]$Name, [int]$Default = 0)
     try {
@@ -417,6 +438,11 @@ if ($Context.IsIntune) {
     return
 }
 
+$imagemEmSessao = Test-ImagemEmSessao -NomeConta $accountName
+if ($imagemEmSessao) {
+    Write-InstallerLog -Context $Context -Message "Usuario '$accountName' esta conectado. A senha da conta sera preservada." -Level Warning
+}
+
 $password = $null
 $securePass = $null
 $senhaBios = $null
@@ -431,7 +457,10 @@ try {
 
     $usuarioImagem = Get-LocalUser -Name $accountName -ErrorAction SilentlyContinue
 
-    if ($imagemGerenciadaPeloLaps) {
+    if ($imagemEmSessao) {
+        $senhaImagemParaRegistro = 'NAO ALTERADA - CONTA EM USO'
+        Write-InstallerLog -Context $Context -Message "Criacao e alteracao de senha de '$accountName' ignoradas: conta em uso."
+    } elseif ($imagemGerenciadaPeloLaps) {
         $senhaImagemParaRegistro = $lapsFieldValue
 
         if ($null -ne $usuarioImagem) {
@@ -503,11 +532,15 @@ try {
 
     if ([string]::IsNullOrWhiteSpace($senhaImagemParaRegistro)) { $senhaImagemParaRegistro = 'N/C' }
 
-    try {
-        $pathsUser = Write-LocalObfuscatedBackupUser -Context $Context -Pc $pc -Password $senhaImagemParaRegistro -AccountName $accountName -Stage 'GERADA'
-        Write-InstallerLog -Context $Context -Message "Backup local ofuscado do usuario $accountName registrado em: $($pathsUser -join ' | ')"
-    } catch {
-        Write-InstallerLog -Context $Context -Message "Erro ao criar backup local ofuscado do usuario ${accountName}: $($_.Exception.Message)" -Level Warning
+    if (-not $imagemEmSessao) {
+        try {
+            $pathsUser = Write-LocalObfuscatedBackupUser -Context $Context -Pc $pc -Password $senhaImagemParaRegistro -AccountName $accountName -Stage 'GERADA'
+            Write-InstallerLog -Context $Context -Message "Backup local ofuscado do usuario $accountName registrado em: $($pathsUser -join ' | ')"
+        } catch {
+            Write-InstallerLog -Context $Context -Message "Erro ao criar backup local ofuscado do usuario ${accountName}: $($_.Exception.Message)" -Level Warning
+        }
+    } else {
+        Write-InstallerLog -Context $Context -Message "Backup de senha do usuario '$accountName' ignorado: senha preservada."
     }
 
     try {
@@ -551,7 +584,12 @@ try {
         Write-InstallerLog -Context $Context -Message "Erro ao registrar backup local ofuscado da BIOS: $($_.Exception.Message)" -Level Warning
     }
 
-    $fields = @{ $imagePasswordFieldName = $senhaImagemParaRegistro }
+    $fields = @{}
+    if (-not $imagemEmSessao) {
+        $fields[$imagePasswordFieldName] = $senhaImagemParaRegistro
+    } else {
+        Write-InstallerLog -Context $Context -Message 'Campo da senha do usuario Imagem preservado no TOPdesk.'
+    }
     if ($biosAlteradaPeloScript -and $senhaBiosParaRegistro -ne 'N/C' -and $senhaBiosParaRegistro -ne 'BIOS nao alterada pelo script') {
         $fields[$biosPasswordFieldName] = $senhaBiosParaRegistro
     } else {
@@ -561,7 +599,7 @@ try {
     try {
         $null = Wait-Internet -Context $Context
         Send-TopdeskAssetFields -Context $Context -Config $topdeskConfig -ComputerName $pc -Fields $fields
-        Write-InstallerLog -Context $Context -Message "Senha/status enviados para o TOPdesk. Campo usuario: $senhaImagemParaRegistro"
+        Write-InstallerLog -Context $Context -Message "Campos aplicaveis enviados ao TOPdesk."
     } catch {
         Write-InstallerLog -Context $Context -Message "Falha ao enviar senha/status para o TOPdesk. O script continuara. Erro: $($_.Exception.Message)" -Level Warning
     }
