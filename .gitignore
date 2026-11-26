@@ -1,0 +1,6 @@
+# Segredos privados: nunca versionar
+/60-Segredos/Znuny-Producao.config.json
+/60-Segredos/topdesk-config.json
+/60-Segredos/inventory-config.json
+/Segredos/
+/Fonte/Segredos/

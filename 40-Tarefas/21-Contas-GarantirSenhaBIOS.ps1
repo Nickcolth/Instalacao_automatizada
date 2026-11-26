@@ -3,6 +3,8 @@ param($Context)
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $Context.RepositoryRoot '50-Integracoes\Znuny\Znuny.Api.ps1')
+
 function New-BiosPassword {
     $lower = 'abcdefghijkmnopqrstuvwxyz'
     $upper = 'ABCDEFGHIJKLMNPQRSTUVWXYZ'
@@ -230,7 +232,7 @@ function Save-LocalBiosBackup {
                 -Context $Context `
                 -Message (
                     "Falha ao registrar backup local da BIOS em '$folder': " +
-                    $_.Exception.Message
+                    'detalhes sensiveis omitidos'
                 ) `
                 -Level Warning
         }
@@ -292,200 +294,32 @@ Origem: garantia-pos-validacao
             -Context $Context `
             -Message (
                 'Falha ao gravar backup de rede da senha da BIOS: ' +
-                $_.Exception.Message
+                'detalhes sensiveis omitidos'
             ) `
             -Level Warning
     }
 }
 
-function Send-BiosPasswordToTopdesk {
-    param(
-        $Context,
-        $Config,
-        [string]$ComputerName,
-        [string]$Password
-    )
-
-    if ($null -eq $Config) { return }
-
-    foreach ($required in @('baseUrl','username','password')) {
-        if (
-            -not $Config.PSObject.Properties[$required] -or
-            [string]::IsNullOrWhiteSpace([string]$Config.$required)
-        ) {
-            return
-        }
-    }
-
-    $fieldName = 'senha-bios'
-
-    if (
-        $Config.PSObject.Properties['biosPasswordFieldName'] -and
-        -not [string]::IsNullOrWhiteSpace(
-            [string]$Config.biosPasswordFieldName
-        )
-    ) {
-        $fieldName = [string]$Config.biosPasswordFieldName
-    }
+function Send-BiosPasswordToZnuny {
+    param($Context, $Config, [string]$ComputerName, [string]$Password)
 
     try {
-        $baseUrl = ([string]$Config.baseUrl).TrimEnd('/')
-        $pair = '{0}:{1}' -f `
-            [string]$Config.username,
-            [string]$Config.password
-
-        $basic = [Convert]::ToBase64String(
-            [Text.Encoding]::ASCII.GetBytes($pair)
-        )
-
-        $headers = @{
-            Authorization = "Basic $basic"
-            Accept = 'application/json'
-            'Content-Type' = 'application/json'
-        }
-
-        $encodedName = [Uri]::EscapeDataString($ComputerName)
-        $result = Invoke-RestMethod `
-            -Uri "$baseUrl/tas/api/assetmgmt/assets?nameFragment=$encodedName" `
-            -Headers $headers `
-            -Method Get `
-            -ErrorAction Stop
-
-        $assets = @()
-
-        if ($null -ne $result.PSObject.Properties['dataSet']) {
-            $assets = @($result.dataSet)
-        }
-        elseif ($null -ne $result.PSObject.Properties['results']) {
-            $assets = @($result.results)
-        }
-        else {
-            $assets = @($result)
-        }
-
-        $asset = $null
-
-        foreach ($candidate in $assets) {
-            $candidateName = $null
-
-            foreach ($nameProperty in @(
-                'name','displayName','text','assetName','number'
-            )) {
-                if (
-                    $candidate.PSObject.Properties[$nameProperty] -and
-                    $null -ne $candidate.$nameProperty
-                ) {
-                    $candidateName = [string]$candidate.$nameProperty
-                    break
-                }
-            }
-
-            if ($candidateName -ieq $ComputerName) {
-                $asset = $candidate
-                break
-            }
-        }
-
-        if ($null -eq $asset) {
-            $asset = $assets | Select-Object -First 1
-        }
-
-        if ($null -eq $asset) {
-            throw "Ativo nao encontrado no TOPdesk: $ComputerName"
-        }
-
-        $assetId = $null
-
-        foreach ($idProperty in @('id','unid','assetId')) {
-            if (
-                $asset.PSObject.Properties[$idProperty] -and
-                $null -ne $asset.$idProperty
-            ) {
-                $assetId = [string]$asset.$idProperty
-                break
-            }
-        }
-
-        if ([string]::IsNullOrWhiteSpace($assetId)) {
-            throw 'Ativo encontrado sem identificador utilizavel.'
-        }
-
-        $body = @{
-            $fieldName = $Password
-        } | ConvertTo-Json -Depth 4
-
-        Invoke-RestMethod `
-            -Uri "$baseUrl/tas/api/assetmgmt/assets/$assetId" `
-            -Headers $headers `
-            -Method Post `
-            -Body $body `
-            -ErrorAction Stop |
-            Out-Null
-
-        Write-InstallerLog `
-            -Context $Context `
-            -Message 'Nova senha da BIOS registrada no TOPdesk.' `
-            -Level Success
+        return (Send-ZnunyAssetFields -Context $Context -Config $Config -ComputerName $ComputerName -Fields @{SenhaBios=$Password})
     }
     catch {
-        Write-InstallerLog `
-            -Context $Context `
-            -Message (
-                'Falha ao registrar a nova senha da BIOS no TOPdesk: ' +
-                $_.Exception.Message
-            ) `
-            -Level Warning
+        Write-InstallerLog -Context $Context -Message ('Falha ao registrar a nova senha da BIOS no Znuny: ' + $_.Exception.Message) -Level Warning
+        return $false
     }
 }
 
 function Save-BiosPassword {
-    param(
-        $Context,
-        [string]$Password
-    )
+    param($Context, [string]$Password)
 
     $computerName = [string]$env:COMPUTERNAME
-    $config = $null
-    $configPath = Join-Path `
-        $Context.RepositoryRoot `
-        '60-Segredos\topdesk-config.json'
-
-    if (Test-Path $configPath) {
-        try {
-            $config = Get-Content `
-                -Path $configPath `
-                -Raw `
-                -Encoding UTF8 `
-                -ErrorAction Stop |
-                ConvertFrom-Json
-        }
-        catch {
-            Write-InstallerLog `
-                -Context $Context `
-                -Message (
-                    'Nao foi possivel ler a configuracao do TOPdesk para ' +
-                    "registrar a BIOS: $($_.Exception.Message)"
-                ) `
-                -Level Warning
-        }
-    }
-
-    Save-LocalBiosBackup `
-        -Context $Context `
-        -ComputerName $computerName `
-        -Password $Password
-
-    Save-NetworkBiosBackup `
-        -Context $Context `
-        -Config $config `
-        -ComputerName $computerName `
-        -Password $Password
-
-    Send-BiosPasswordToTopdesk `
-        -Context $Context `
-        -Config $config `
-        -ComputerName $computerName `
-        -Password $Password
+    $config = Get-ZnunyConfig -Context $Context
+    Save-LocalBiosBackup -Context $Context -ComputerName $computerName -Password $Password
+    Save-NetworkBiosBackup -Context $Context -Config $config -ComputerName $computerName -Password $Password
+    return (Send-BiosPasswordToZnuny -Context $Context -Config $config -ComputerName $computerName -Password $Password)
 }
 
 $computerSystem = Get-CimInstance `
@@ -580,7 +414,7 @@ if ($providerReady) {
             -Level Success
     }
     catch {
-        $directError = $_.Exception.Message
+        $directError = 'Falha no DellBIOSProvider; detalhes sensiveis omitidos.'
 
         $stateAfterDirectFailure = Get-BiosPasswordState
 
@@ -683,7 +517,7 @@ if (-not $biosSet) {
             -Level Success
     }
     catch {
-        $fallbackError = $_.Exception.Message
+        $fallbackError = 'Falha no metodo CIM; detalhes sensiveis omitidos.'
         $finalState = Get-BiosPasswordState
 
         if ($finalState.AdminSet -eq $true) {
@@ -716,14 +550,11 @@ if (-not $biosSet) {
     throw 'A senha da BIOS nao foi criada por nenhum metodo.'
 }
 
-Save-BiosPassword `
-    -Context $Context `
-    -Password $newPassword
+$znunyRecorded = Save-BiosPassword -Context $Context -Password $newPassword
 
-Write-InstallerLog `
-    -Context $Context `
-    -Message (
-        'Senha de administrador da BIOS criada e registrada com sucesso. ' +
-        "Metodo usado: $methodUsed"
-    ) `
-    -Level Success
+if ($znunyRecorded) {
+    Write-InstallerLog -Context $Context -Message "Senha de administrador da BIOS criada e confirmada no Znuny. Metodo usado: $methodUsed" -Level Success
+}
+else {
+    Write-InstallerLog -Context $Context -Message "Senha da BIOS criada. Registro no Znuny pendente; confira os backups existentes. Metodo usado: $methodUsed" -Level Warning
+}

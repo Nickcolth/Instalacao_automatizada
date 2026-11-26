@@ -22,6 +22,10 @@ $requiredFiles = @(
     '40-Tarefas\10-Seguranca-InstalarAgentesEmpresa.ps1',
     '40-Tarefas\50-Aplicativos-InstalarBase.ps1',
     '50-Integracoes\Topdesk\Get_Topdesk.ps1',
+    '50-Integracoes\Znuny\Znuny.Api.ps1',
+    '50-Integracoes\Atualizar-StatusLapsZnuny.ps1',
+    '60-Segredos\Znuny-Producao.config.exemplo.json',
+    '85-Ferramentas\Diagnosticos\Testar-ZnunyApiSimulada.ps1',
     '70-Deteccao\Detectar-PreparoIntune.ps1'
 )
 
@@ -33,11 +37,28 @@ foreach ($relativePath in $requiredFiles) {
 
 foreach ($privatePath in @(
     '60-Segredos\topdesk-config.json',
+    '60-Segredos\Znuny-Producao.config.json',
     '60-Segredos\inventory-config.json'
 )) {
     if (Test-Path (Join-Path $root $privatePath)) {
         Add-ValidationError "Arquivo privado publicado: $privatePath"
     }
+}
+
+foreach ($obsolete in @(
+    '50-Integracoes\Atualizar-StatusLapsTopdesk.ps1',
+    '60-Segredos\topdesk-config.exemplo.json'
+)) {
+    if (Test-Path (Join-Path $root $obsolete)) { Add-ValidationError "Arquivo antigo presente: $obsolete" }
+}
+$examplePath = Join-Path $root '60-Segredos\Znuny-Producao.config.exemplo.json'
+if (Test-Path $examplePath) {
+    try {
+        $example = Get-Content -LiteralPath $examplePath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($example.UserLogin -cne '' -or $example.Password -cne '') {
+            Add-ValidationError 'O exemplo Znuny deve ter login e senha vazios.'
+        }
+    } catch { Add-ValidationError 'Exemplo Znuny invalido.' }
 }
 
 foreach ($file in @(
@@ -334,6 +355,31 @@ if (Test-Path $getTopdeskPath) {
         'c65b3b41ed4202a1aef3f7876bb522b8b955df80f6bb09fed4a2cbe745767793'
     ) {
         Add-ValidationError 'Get_Topdesk.ps1 foi alterado.'
+    }
+}
+
+$manifestPath = Join-Path $root 'MANIFESTO-SHA256.txt'
+if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+    Add-ValidationError 'Manifesto SHA256 ausente.'
+} else {
+    $seen = @{}
+    foreach ($line in (Get-Content -LiteralPath $manifestPath -Encoding UTF8)) {
+        if ($line -notmatch '^([0-9a-f]{64})  (.+)$') {
+            Add-ValidationError 'Linha invalida no manifesto SHA256.'
+            continue
+        }
+        $expectedHash = $Matches[1]; $relative = $Matches[2]
+        if ([IO.Path]::IsPathRooted($relative) -or $relative -match '(^|[\\/])\.\.([\\/]|$)' -or $seen.ContainsKey($relative)) {
+            Add-ValidationError 'Caminho invalido ou duplicado no manifesto.'
+            continue
+        }
+        $seen[$relative] = $true
+        $target = Join-Path $root $relative
+        if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
+            Add-ValidationError "Arquivo do manifesto ausente: $relative"
+        } elseif ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedHash) {
+            Add-ValidationError "SHA256 divergente: $relative"
+        }
     }
 }
 

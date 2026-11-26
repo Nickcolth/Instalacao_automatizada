@@ -110,7 +110,10 @@ C:\ProgramData\ImagemTI\Recursos\Desligar.vbs
 Os atalhos sao criados no Menu Iniciar e na Area de Trabalho do
 colaborador.
 
-## TOPdesk
+## Inventario via n8n
+
+O nome Topdesk neste agente e legado. O envio ao webhook n8n, a tarefa agendada
+e a validacao de integridade permanecem inalterados nesta migracao de senhas.
 
 O arquivo `50-Integracoes\Topdesk\Get_Topdesk.ps1` deve manter o
 SHA-256:
@@ -118,6 +121,23 @@ SHA-256:
 ```text
 c65b3b41ed4202a1aef3f7876bb522b8b955df80f6bb09fed4a2cbe745767793
 ```
+
+## Senhas e status no Znuny
+
+As tarefas 20 e 21 usam `50-Integracoes\Znuny\Znuny.Api.ps1` e leem o JSON
+privado do fileserver, ou sua copia em `60-Segredos\Znuny-Producao.config.json`.
+O modo Intune da tarefa 20 registra `Gerenciado via LAPS`, sem criar/alterar
+usuario local ou BIOS. A tarefa 21 so registra a senha da BIOS que ela propria
+conseguiu definir. Senhas ja existentes nao sao inventadas nem substituidas.
+
+A API recebe somente `SenhaUsuarioImagem` e/ou `SenhaBios`, com
+`ReplaceExistingData=0`, e o ativo e relido para confirmar a gravacao. A pesquisa
+exige um unico nome e classe exatos: nao existe fallback para o primeiro ativo.
+Falhas de registro sao avisadas sem publicar senhas nos logs, e os backups
+originais de senha continuam nos destinos existentes. Se a aplicacao local da
+senha do Imagem falhar, nao e registrada como senha valida no CMDB nem no
+backup. O GET posterior verifica anexos quando a API os retorna; a preservacao
+real de anexos e estados precisa ser validada no piloto.
 
 
 ## Processos demorados

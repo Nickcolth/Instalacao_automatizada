@@ -56,4 +56,4 @@ Write-InstallerLog -Context $Context -Message 'Etapa manual final registrada. O 
 Write-InstallerLog -Context $Context -Message 'Confira OneDrive, Outlook, VPN, BitLocker e remova/valide permissoes administrativas conforme o procedimento interno.' -Level Warning
 Write-InstallerLog -Context $Context -Message 'As atualizacoes finais de aplicativos e politicas serao executadas automaticamente antes do aviso de encerramento.' -Level Warning
 Write-InstallerLog -Context $Context -Message 'Gpupdate limitado a 120 segundos de espera e 180 segundos de timeout total; a finalizacao continua mesmo se ele nao responder.' -Level Warning
-Write-InstallerLog -Context $Context -Message 'Confirme no TOPdesk os dados de senha/status e inventario; depois remova logs sensiveis conforme o procedimento interno.' -Level Warning
+Write-InstallerLog -Context $Context -Message 'Confirme no Znuny os dados de senha/status e no fluxo n8n o inventario; depois remova logs sensiveis conforme o procedimento interno.' -Level Warning

@@ -3,7 +3,7 @@ param(
     [string]$Repositorio = 'Nickcolth/Instalacao_automatizada',
     [string]$Branch = 'main',
     [string]$DiretorioTrabalho = "$env:ProgramData\ImagemTI\Instalador",
-    [string]$SegredosOrigem = '\\fileserver\sdk\Softwares\Instalacao_automatizada\TOPdesk',
+    [string]$SegredosOrigem = '\\fileserver\SDK\Softwares\Instalacao_automatizada\Znuny',
     [switch]$ManterArquivos
 )
 
@@ -270,7 +270,7 @@ function Copiar-Segredos {
             $arquivosSeguros = @(
                 Get-ChildItem -LiteralPath $caminho -Recurse -File -ErrorAction SilentlyContinue
             )
-            if ($arquivosSeguros.Count -gt 0) {
+            if ($arquivosSeguros.Count -gt 0 -and (Test-Path -LiteralPath (Join-Path $caminho 'Znuny-Producao.config.json') -PathType Leaf)) {
                 Escrever-Console "Copiando arquivos de segredo de: $caminho" 'INFO'
                 Copiar-ConteudoSeguro -Origem $caminho -Destino $Destino | Out-Null
                 return $true
@@ -279,15 +279,15 @@ function Copiar-Segredos {
     }
 
     if (-not [string]::IsNullOrWhiteSpace($Origem)) {
-        if (Test-Path -LiteralPath $Origem) {
-            $arquivosSeguros = @(
-                Get-ChildItem -LiteralPath $Origem -Recurse -File -ErrorAction SilentlyContinue
-            )
-            if ($arquivosSeguros.Count -gt 0) {
+        try {
+            if (Test-Path -LiteralPath (Join-Path $Origem 'Znuny-Producao.config.json') -PathType Leaf -ErrorAction Stop) {
                 Escrever-Console "Copiando arquivos de segredo de: $Origem" 'INFO'
                 Copiar-ConteudoSeguro -Origem $Origem -Destino $Destino | Out-Null
                 return $true
             }
+        }
+        catch {
+            Escrever-Console 'Nao foi possivel acessar/copiar segredos com a identidade atual. Detalhes omitidos.' 'AVISO'
         }
 
         if ($SolicitarCredencialSeNecessario -and $Origem -match '^\\') {
@@ -296,7 +296,7 @@ function Copiar-Segredos {
 
             $credencial = Get-Credential -Message "Credencial para acessar $Origem"
             if ($null -eq $credencial) {
-                Escrever-Console 'Credencial nao informada. Integracoes como TOPdesk poderao ser ignoradas.' 'AVISO'
+                Escrever-Console 'Credencial nao informada. A integracao com o Znuny podera ser ignorada.' 'AVISO'
                 return $false
             }
 
@@ -332,8 +332,8 @@ function Copiar-Segredos {
                 $arquivosSeguros = @(
                     Get-ChildItem -LiteralPath $origemMapeada -Recurse -File -ErrorAction SilentlyContinue
                 )
-                if ($arquivosSeguros.Count -eq 0) {
-                    Escrever-Console "Pasta acessivel, mas nenhum arquivo seguro foi encontrado: $Origem" 'AVISO'
+                if ($arquivosSeguros.Count -eq 0 -or -not (Test-Path -LiteralPath (Join-Path $origemMapeada 'Znuny-Producao.config.json') -PathType Leaf)) {
+                    Escrever-Console "Pasta acessivel, mas o JSON privado do Znuny nao foi encontrado: $Origem" 'AVISO'
                     return $false
                 }
 
@@ -342,7 +342,7 @@ function Copiar-Segredos {
                 return $true
             }
             catch {
-                Escrever-Console "Falha ao acessar/copiar segredos do fileserver: $($_.Exception.Message)" 'ERRO'
+                Escrever-Console 'Falha ao acessar/copiar segredos do fileserver. Detalhes omitidos.' 'ERRO'
                 return $false
             }
             finally {
@@ -353,7 +353,7 @@ function Copiar-Segredos {
         }
     }
 
-    Escrever-Console "Nenhum arquivo de segredo encontrado. Integracoes como TOPdesk poderao ser ignoradas." 'AVISO'
+    Escrever-Console "Nenhum arquivo de segredo encontrado. A integracao com o Znuny podera ser ignorada." 'AVISO'
     return $false
 }
 

@@ -6,7 +6,7 @@
 20-Configuracoes    aplicativos, perfis, empresas e Office
 30-Links            enderecos dos instaladores
 40-Tarefas          etapas executadas pelos perfis
-50-Integracoes      TOPdesk e integracoes auxiliares
+50-Integracoes      Znuny e agente legado de inventario via n8n
 60-Segredos         modelos de configuracao
 70-Deteccao         scripts de deteccao
 80-Recursos         TeamViewer, desligamento e avisos

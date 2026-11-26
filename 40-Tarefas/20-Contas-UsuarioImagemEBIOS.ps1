@@ -3,6 +3,8 @@ param($Context)
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $Context.RepositoryRoot '50-Integracoes\Znuny\Znuny.Api.ps1')
+
 function Test-ImagemEmSessao {
     param([string]$NomeConta)
     $nomes = @()
@@ -188,24 +190,6 @@ function Write-LocalObfuscatedBackupBiosIfOk {
     Write-ObfuscatedLine -Context $Context -Pc $Pc -Line $line -AccountName $AccountName
 }
 
-function Get-TopdeskConfig {
-    param($Context)
-
-    $configPath = Join-Path $Context.RepositoryRoot '60-Segredos\topdesk-config.json'
-    if (-not (Test-Path $configPath)) {
-        Write-InstallerLog -Context $Context -Message 'Configuracao segura do TOPdesk nao encontrada. Etapa de envio ao TOPdesk sera ignorada.' -Level Warning
-        return $null
-    }
-
-    $config = Get-Content -Path $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    foreach ($required in @('baseUrl','username','password')) {
-        if ([string]::IsNullOrWhiteSpace([string]$config.$required)) {
-            throw "Campo obrigatorio ausente no arquivo 60-Segredos\topdesk-config.json: $required"
-        }
-    }
-    return $config
-}
-
 function Get-SafePropertyValue {
     param(
         $Object,
@@ -223,90 +207,6 @@ function Get-SafePropertyValue {
     }
 
     return $null
-}
-
-function Send-TopdeskAssetFields {
-    param($Context, $Config, [string]$ComputerName, [hashtable]$Fields)
-
-    if ($null -eq $Config) { return }
-    if ($Fields.Count -eq 0) { return }
-
-    $baseUrl = ([string]$Config.baseUrl).TrimEnd('/')
-    $pair = '{0}:{1}' -f [string]$Config.username, [string]$Config.password
-    $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
-
-    $headers = @{
-        Authorization = "Basic $basic"
-        Accept = 'application/json'
-        'Content-Type' = 'application/json'
-    }
-
-    $encodedName = [Uri]::EscapeDataString($ComputerName)
-    $searchUrl = "$baseUrl/tas/api/assetmgmt/assets?nameFragment=$encodedName"
-
-    Write-InstallerLog -Context $Context -Message "Localizando ativo no TOPdesk pelo nome: $ComputerName"
-
-    $result = Invoke-RestMethod `
-        -Uri $searchUrl `
-        -Headers $headers `
-        -Method Get `
-        -ErrorAction Stop
-
-    $assets = @()
-
-    if ($null -ne $result) {
-        $dataSetProperty = $result.PSObject.Properties['dataSet']
-        $resultsProperty = $result.PSObject.Properties['results']
-
-        if ($null -ne $dataSetProperty) {
-            $assets = @($dataSetProperty.Value)
-        }
-        elseif ($null -ne $resultsProperty) {
-            $assets = @($resultsProperty.Value)
-        }
-        else {
-            $assets = @($result)
-        }
-    }
-
-    $asset = $null
-
-    foreach ($candidate in $assets) {
-        $candidateName = [string](Get-SafePropertyValue `
-            -Object $candidate `
-            -Names @('name','displayName','text','assetName','number'))
-
-        if ($candidateName -ieq $ComputerName) {
-            $asset = $candidate
-            break
-        }
-    }
-
-    if ($null -eq $asset) {
-        $asset = $assets | Select-Object -First 1
-    }
-
-    $assetId = Get-SafePropertyValue `
-        -Object $asset `
-        -Names @('id','unid','assetId')
-
-    if ($null -eq $asset -or [string]::IsNullOrWhiteSpace([string]$assetId)) {
-        throw "Ativo nao encontrado no TOPdesk: $ComputerName"
-    }
-
-    $assetUrl = "$baseUrl/tas/api/assetmgmt/assets/$assetId"
-
-    Invoke-RestMethod `
-        -Uri $assetUrl `
-        -Headers $headers `
-        -Method Post `
-        -Body ($Fields | ConvertTo-Json -Depth 5) `
-        -ErrorAction Stop |
-        Out-Null
-
-    Write-InstallerLog `
-        -Context $Context `
-        -Message "TOPdesk atualizado. Campos enviados: $((@($Fields.Keys)) -join ', ')"
 }
 
 function Get-ConfigString {
@@ -345,7 +245,7 @@ function Write-NetworkBackup {
         [string]$SenhaBiosParaRegistro
     )
 
-    $logFolder = Get-ConfigString -Config $Config -Name 'networkBackupPath' -Default '\\fileserver\Backup\logsenha'
+    $logFolder = Get-ConfigString -Config $Config -Name 'networkBackupPath' -Default '\\fileserver\SDK\Softwares\Instalacao_automatizada\logsenha'
     if ([string]::IsNullOrWhiteSpace($logFolder) -or $logFolder -eq 'disabled') {
         Write-InstallerLog -Context $Context -Message 'Backup de rede desabilitado pela configuracao.'
         return
@@ -384,16 +284,16 @@ Senha Admin da BIOS: $SenhaBiosParaRegistro
         $logContent | Out-File -FilePath $logFile -Encoding UTF8 -Append -ErrorAction Stop
         Write-InstallerLog -Context $Context -Message "Backup da senha criado em $logFile"
     } catch {
-        Write-InstallerLog -Context $Context -Message "Erro ao gravar o log de rede. Backup ignorado: $($_.Exception.Message)" -Level Warning
+        Write-InstallerLog -Context $Context -Message "Erro ao gravar o log de rede. Backup ignorado: detalhes sensiveis omitidos" -Level Warning
     }
 }
 
-$topdeskConfig = Get-TopdeskConfig -Context $Context
+$znunyConfig = Get-ZnunyConfig -Context $Context
 $pc = $env:COMPUTERNAME
-$accountName = Get-ConfigString -Config $topdeskConfig -Name 'imageAccountName' -Default 'Imagem'
-$imagePasswordFieldName = Get-ConfigString -Config $topdeskConfig -Name 'imagePasswordFieldName' -Default (Get-ConfigString -Config $topdeskConfig -Name 'lapsFieldName' -Default 'senha-usuario-imagem')
-$biosPasswordFieldName  = Get-ConfigString -Config $topdeskConfig -Name 'biosPasswordFieldName' -Default 'senha-bios'
-$lapsFieldValue = Get-ConfigString -Config $topdeskConfig -Name 'lapsFieldValue' -Default 'Gerenciado via LAPS'
+$accountName = Get-ConfigString -Config $znunyConfig -Name 'imageAccountName' -Default 'Imagem'
+$imagePasswordFieldName = 'SenhaUsuarioImagem'
+$biosPasswordFieldName = 'SenhaBios'
+$lapsFieldValue = Get-ConfigString -Config $znunyConfig -Name 'lapsFieldValue' -Default 'Gerenciado via LAPS'
 
 $imagemGerenciadaPeloLaps = Test-LapsGerenciaContaImagem -AccountName $accountName
 
@@ -401,20 +301,20 @@ if ($Context.IsIntune) {
     if ($imagemGerenciadaPeloLaps) {
         Write-InstallerLog -Context $Context -Message "Windows LAPS detectado gerenciando a conta '$accountName'."
     } else {
-        Write-InstallerLog -Context $Context -Message "Politica do Windows LAPS ainda nao foi detectada localmente, mas o modo Intune registrara '$lapsFieldValue' no TOPdesk conforme perfil Autopilot." -Level Warning
+        Write-InstallerLog -Context $Context -Message "Politica do Windows LAPS ainda nao foi detectada localmente, mas o modo Intune registrara '$lapsFieldValue' no Znuny conforme perfil Autopilot." -Level Warning
     }
 
     try {
-        Send-TopdeskAssetFields `
+        $registered = Send-ZnunyAssetFields `
             -Context $Context `
-            -Config $topdeskConfig `
+            -Config $znunyConfig `
             -ComputerName $pc `
             -Fields @{ $imagePasswordFieldName = $lapsFieldValue }
 
-        if ($null -ne $topdeskConfig) {
+        if ($registered) {
             Write-InstallerLog `
                 -Context $Context `
-                -Message "TOPdesk registrado como '$lapsFieldValue'." `
+                -Message "Znuny registrado como '$lapsFieldValue'." `
                 -Level Success
         }
     }
@@ -422,7 +322,7 @@ if ($Context.IsIntune) {
         Write-InstallerLog `
             -Context $Context `
             -Message (
-                'Nao foi possivel atualizar o TOPdesk durante o ' +
+                'Nao foi possivel atualizar o Znuny durante o ' +
                 "Autopilot. A instalacao continuara. Erro: $($_.Exception.Message)"
             ) `
             -Level Warning
@@ -449,6 +349,7 @@ $senhaBios = $null
 $senhaBiosParaRegistro = 'BIOS nao alterada pelo script'
 $senhaImagemParaRegistro = $null
 $biosAlteradaPeloScript = $false
+$imagemProntaParaRegistro = $false
 
 try {
     $password = New-GeneratedPassword
@@ -462,19 +363,20 @@ try {
         Write-InstallerLog -Context $Context -Message "Criacao e alteracao de senha de '$accountName' ignoradas: conta em uso."
     } elseif ($imagemGerenciadaPeloLaps) {
         $senhaImagemParaRegistro = $lapsFieldValue
+        $imagemProntaParaRegistro = $true
 
         if ($null -ne $usuarioImagem) {
             Write-InstallerLog -Context $Context -Message "Windows LAPS esta configurado para gerenciar a conta '$accountName' e a conta ja existe. Nenhuma alteracao sera feita na conta ou senha."
         } else {
-            $createBackup = Get-ConfigBool -Config $topdeskConfig -Name 'createImageAccountAsBackupWhenLapsDetected' -Default $true
+            $createBackup = Get-ConfigBool -Config $znunyConfig -Name 'createImageAccountAsBackupWhenLapsDetected' -Default $true
             if ($createBackup) {
                 Write-InstallerLog -Context $Context -Message "Windows LAPS esta configurado para gerenciar '$accountName', mas a conta ainda nao existe. Criando conta como backup com senha temporaria."
                 try {
                     $securePass = ConvertTo-SecureString $password -AsPlainText -Force
-                    New-LocalUser -Name $accountName -Password $securePass -FullName $accountName -Description 'Conta local de suporte. Gerenciada pelo Windows LAPS.' -PasswordNeverExpires -UserMayNotChangePassword:$true
+                    New-LocalUser -Name $accountName -Password $securePass -FullName $accountName -Description 'Conta local de suporte. Gerenciada pelo Windows LAPS.' -PasswordNeverExpires -UserMayNotChangePassword:$true -ErrorAction Stop
                     Write-InstallerLog -Context $Context -Message "Usuario '$accountName' criado como backup. A senha temporaria nao sera registrada, pois a conta e gerenciada pelo LAPS."
                 } catch {
-                    Write-InstallerLog -Context $Context -Message "Erro ao criar o usuario '$accountName' como backup: $($_.Exception.Message)" -Level Warning
+                    Write-InstallerLog -Context $Context -Message "Erro ao criar o usuario '$accountName' como backup: detalhes sensiveis omitidos" -Level Warning
                 }
             } else {
                 Write-InstallerLog -Context $Context -Message "LAPS detectado e conta '$accountName' ausente. Criacao ignorada por configuracao." -Level Warning
@@ -486,17 +388,19 @@ try {
 
         if ($null -eq $usuarioImagem) {
             try {
-                New-LocalUser -Name $accountName -Password $securePass -FullName $accountName -Description 'Criado por script de provisionamento' -PasswordNeverExpires -UserMayNotChangePassword:$true
+                New-LocalUser -Name $accountName -Password $securePass -FullName $accountName -Description 'Criado por script de provisionamento' -PasswordNeverExpires -UserMayNotChangePassword:$true -ErrorAction Stop
+                $imagemProntaParaRegistro = $true
                 Write-InstallerLog -Context $Context -Message "Usuario '$accountName' criado com a senha gerada pelo script."
             } catch {
-                Write-InstallerLog -Context $Context -Message "Erro ao criar o usuario '$accountName': $($_.Exception.Message)" -Level Warning
+                Write-InstallerLog -Context $Context -Message "Erro ao criar o usuario '$accountName': detalhes sensiveis omitidos" -Level Warning
             }
         } else {
             try {
-                Set-LocalUser -Name $accountName -Password $securePass
+                Set-LocalUser -Name $accountName -Password $securePass -ErrorAction Stop
+                $imagemProntaParaRegistro = $true
                 Write-InstallerLog -Context $Context -Message "Usuario '$accountName' ja existia e nao foi detectado como gerenciado pelo LAPS. Senha atualizada pelo script."
             } catch {
-                Write-InstallerLog -Context $Context -Message "Erro ao atualizar senha do usuario '$accountName': $($_.Exception.Message)" -Level Warning
+                Write-InstallerLog -Context $Context -Message "Erro ao atualizar senha do usuario '$accountName': detalhes sensiveis omitidos" -Level Warning
             }
         }
     }
@@ -530,17 +434,21 @@ try {
         Write-InstallerLog -Context $Context -Message "Usuario '$accountName' nao existe apos a validacao/criacao. Etapa de grupo administrador e senha nunca expira ignorada." -Level Warning
     }
 
+    if (-not $imagemEmSessao -and -not $imagemProntaParaRegistro) {
+        $senhaImagemParaRegistro = 'NAO ALTERADA - APLICACAO LOCAL NAO CONFIRMADA'
+    }
+
     if ([string]::IsNullOrWhiteSpace($senhaImagemParaRegistro)) { $senhaImagemParaRegistro = 'N/C' }
 
-    if (-not $imagemEmSessao) {
+    if (-not $imagemEmSessao -and $imagemProntaParaRegistro) {
         try {
             $pathsUser = Write-LocalObfuscatedBackupUser -Context $Context -Pc $pc -Password $senhaImagemParaRegistro -AccountName $accountName -Stage 'GERADA'
             Write-InstallerLog -Context $Context -Message "Backup local ofuscado do usuario $accountName registrado em: $($pathsUser -join ' | ')"
         } catch {
-            Write-InstallerLog -Context $Context -Message "Erro ao criar backup local ofuscado do usuario ${accountName}: $($_.Exception.Message)" -Level Warning
+            Write-InstallerLog -Context $Context -Message "Erro ao criar backup local ofuscado do usuario ${accountName}: detalhes sensiveis omitidos" -Level Warning
         }
     } else {
-        Write-InstallerLog -Context $Context -Message "Backup de senha do usuario '$accountName' ignorado: senha preservada."
+        Write-InstallerLog -Context $Context -Message "Backup de senha do usuario '$accountName' ignorado: senha preservada ou aplicacao local nao confirmada."
     }
 
     try {
@@ -570,7 +478,7 @@ try {
     } catch {
         $biosAlteradaPeloScript = $false
         $senhaBiosParaRegistro = 'BIOS nao alterada pelo script'
-        Write-InstallerLog -Context $Context -Message "Nao foi possivel definir a senha da BIOS. Pode ja existir senha configurada, nao ser Dell ou houve erro no DellBIOSProvider. O script continuara. Erro: $($_.Exception.Message)" -Level Warning
+        Write-InstallerLog -Context $Context -Message "Nao foi possivel definir a senha da BIOS. Pode ja existir senha configurada, nao ser Dell ou houve erro no DellBIOSProvider. O script continuara. Erro: detalhes sensiveis omitidos" -Level Warning
     }
 
     try {
@@ -581,30 +489,31 @@ try {
             Write-InstallerLog -Context $Context -Message "BIOS nao alterada pelo script; linha de BIOS nao foi registrada no backup local. PC: $pc"
         }
     } catch {
-        Write-InstallerLog -Context $Context -Message "Erro ao registrar backup local ofuscado da BIOS: $($_.Exception.Message)" -Level Warning
+        Write-InstallerLog -Context $Context -Message "Erro ao registrar backup local ofuscado da BIOS: detalhes sensiveis omitidos" -Level Warning
     }
 
     $fields = @{}
-    if (-not $imagemEmSessao) {
+    if (-not $imagemEmSessao -and $imagemProntaParaRegistro) {
         $fields[$imagePasswordFieldName] = $senhaImagemParaRegistro
     } else {
-        Write-InstallerLog -Context $Context -Message 'Campo da senha do usuario Imagem preservado no TOPdesk.'
+        Write-InstallerLog -Context $Context -Message 'Campo da senha do usuario Imagem preservado no Znuny: conta em uso ou alteracao local nao confirmada.'
     }
     if ($biosAlteradaPeloScript -and $senhaBiosParaRegistro -ne 'N/C' -and $senhaBiosParaRegistro -ne 'BIOS nao alterada pelo script') {
         $fields[$biosPasswordFieldName] = $senhaBiosParaRegistro
     } else {
-        Write-InstallerLog -Context $Context -Message 'Senha da BIOS nao sera enviada ao TOPdesk, pois a BIOS nao foi alterada pelo script.'
+        Write-InstallerLog -Context $Context -Message 'Senha da BIOS nao sera enviada ao Znuny, pois a BIOS nao foi alterada pelo script.'
     }
+
+    Write-NetworkBackup -Context $Context -Config $znunyConfig -Pc $pc -SenhaImagemParaRegistro $senhaImagemParaRegistro -SenhaBiosParaRegistro $senhaBiosParaRegistro
 
     try {
         $null = Wait-Internet -Context $Context
-        Send-TopdeskAssetFields -Context $Context -Config $topdeskConfig -ComputerName $pc -Fields $fields
-        Write-InstallerLog -Context $Context -Message "Campos aplicaveis enviados ao TOPdesk."
+        $registered = Send-ZnunyAssetFields -Context $Context -Config $znunyConfig -ComputerName $pc -Fields $fields
+        if ($registered) { Write-InstallerLog -Context $Context -Message 'Campos aplicaveis confirmados no Znuny.' }
     } catch {
-        Write-InstallerLog -Context $Context -Message "Falha ao enviar senha/status para o TOPdesk. O script continuara. Erro: $($_.Exception.Message)" -Level Warning
+        Write-InstallerLog -Context $Context -Message "Falha ao enviar senha/status para o Znuny. O script continuara. Erro: $($_.Exception.Message)" -Level Warning
     }
 
-    Write-NetworkBackup -Context $Context -Config $topdeskConfig -Pc $pc -SenhaImagemParaRegistro $senhaImagemParaRegistro -SenhaBiosParaRegistro $senhaBiosParaRegistro
 }
 finally {
     $senhaBios = $null

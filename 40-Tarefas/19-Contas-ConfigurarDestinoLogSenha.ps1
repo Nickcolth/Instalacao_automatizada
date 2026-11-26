@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 
 $configPath = Join-Path `
     $Context.RepositoryRoot `
-    '60-Segredos\topdesk-config.json'
+    '60-Segredos\Znuny-Producao.config.json'
 
 $novoDestino = '\\fileserver\SDK\Softwares\Instalacao_automatizada\logsenha'
 
@@ -12,8 +12,7 @@ if (-not (Test-Path $configPath)) {
     Write-InstallerLog `
         -Context $Context `
         -Message (
-            'Configuracao do TOPdesk nao encontrada para ajustar o ' +
-            "destino do log de senha. Caminho esperado: $configPath"
+            'Copia privada do Znuny ausente; tarefas 20/21 usam o JSON UNC e o destino padrao de backup.'
         ) `
         -Level Warning
 
@@ -56,8 +55,5 @@ try {
         -Level Success
 }
 catch {
-    throw (
-        'Falha ao configurar o destino do log de senha: ' +
-        $_.Exception.Message
-    )
+    Write-InstallerLog -Context $Context -Message 'Falha ao configurar o destino do log de senha. Detalhes omitidos; preparacao continua.' -Level Warning
 }

@@ -1,6 +1,6 @@
 # Instalacao automatizada corporativa
 
-Versao: **2026.07.16.1**
+Versao: **2026.11.26.1**
 
 Este repositorio automatiza a preparacao e a padronizacao de notebooks
 Windows utilizados pela empresa.
@@ -17,7 +17,7 @@ O projeto centraliza:
 - configuracoes de sistema e energia;
 - criacao e configuracao da conta local de suporte;
 - configuracao de recursos da sessao do colaborador;
-- inventario e integracao com o TOPdesk;
+- inventario via n8n e registro de senhas/status no Znuny;
 - validacao dos aplicativos instalados;
 - registro de logs e relatorios de execucao.
 
@@ -52,7 +52,7 @@ A fase critica insiste continuamente com nova tentativa a cada 60 segundos. Depo
 20-Configuracoes    aplicativos, empresas, perfis e Office
 30-Links            enderecos dos instaladores
 40-Tarefas          etapas de preparacao
-50-Integracoes      TOPdesk e integracoes auxiliares
+50-Integracoes      Znuny e agente legado de inventario via n8n
 60-Segredos         modelos de configuracao
 70-Deteccao         scripts de deteccao
 80-Recursos         recursos utilizados pelo instalador
